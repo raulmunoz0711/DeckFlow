@@ -1,5 +1,5 @@
 # 1. The industry
-Game Citi TCG operates in the for-profit trading-card retail and resale industry. Businesses like Game Citi make money from sealed trading-card products, buying and reselling individual cards and collections, trades, and potentially online marketplace sales.
+Game Citi TCG operates in the for-profit trading-card retail and resale industry. Businesses like Game Citi make money from sealed trading-card products, buying and reselling individual cards and collections, facilitating trades, and potentially selling through online marketplaces.
 
 The U.S. trading card game market generated an estimated $6.07 billion in 2025, according to Grand View Research. The secondary market—where individual cards are bought and resold—is particularly relevant to our domain because the value of a card can change dramatically based on its condition and whether it receives a professional grade.
 
@@ -9,11 +9,13 @@ For these businesses, grading is an investment decision. The business has a raw 
 Game Citi is currently our only interviewed client, so we cannot yet claim how many card shops experience this problem or how significant it is across the industry.
 
 # 2. Who else has this problem
-Our current client is Dan, owner of Game Citi TCG near Cal State Fullerton. The problem we're investigating is the decision a card business makes when determining whether a raw card is worth professionally grading.
-The potential domain extends beyond Game Citi to other for-profit card shops, card-show vendors, resellers and businesses that regularly purchase raw collections. However, we have only interviewed Game Citi so far, so whether those other businesses experience the problem at a meaningful scale is still an assumption we need to validate.
+Our current client is Dan, owner of Game Citi TCG near Cal State Fullerton. We're investigating the decision a card business makes about whether a raw card is worth professionally grading.
+The potential domain extends beyond Game Citi to other for-profit card shops, card-show vendors, resellers, and businesses that regularly purchase raw collections. However, we have only interviewed Game Citi so far, so whether those other businesses experience the problem at a meaningful scale is still an assumption we need to validate.
 
 The decision matters because the same card can have substantially different market values depending on its professional grade. A seller therefore has to consider:
+
 |raw card value → condition → likely grade → graded value → grading costs → selling costs → expected profit|
+
 Businesses already spend money addressing this problem. Professional grading itself is a paid service, and card businesses also spend employee or owner time inspecting cards, researching comparable sales, and deciding which cards warrant submission.
 
 The important question for our research isn't merely whether collectors like knowing grades. It's whether for-profit sellers make enough grading decisions that improving the quality and speed of those decisions has measurable financial value.

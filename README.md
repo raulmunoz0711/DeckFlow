@@ -18,7 +18,7 @@ Businesses already spend money addressing this problem. Professional grading its
 
 The important question for our research isn't merely whether collectors like knowing grades. It's whether for-profit sellers make enough grading decisions that improving the quality and speed of those decisions has measurable financial value.
 
-3. How it is handled today and what it costs
+# 3. How it is handled today and what it costs
 Today, the decision is largely made through manual inspection and market research.
 A seller examines a raw card's condition. They consider characteristics such as:
 - centering

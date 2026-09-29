@@ -1,3 +1,9 @@
+# Team Members
+Anthony Jimenez 	| GitHub: AnthonyJ1321 	| anthony.jimenez1321@gmail.com
+Raul Munoz 		| GitHub: raulmunoz0711 	| raulmunoz@csu.fullerton.edu
+Isaac Parada 		| GitHub: Mr1saac 		| paradaisaac65@gmail.com
+Jovanny Reyes 	| GitHub: jovannyreyes-23	| jovannyreyes.23@csu.fullerton.edu
+
 # 1. The industry
 Game Citi TCG operates in the for-profit trading-card retail and resale industry. Businesses like Game Citi make money from sealed trading-card products, buying and reselling individual cards and collections, facilitating trades, and potentially selling through online marketplaces.
 

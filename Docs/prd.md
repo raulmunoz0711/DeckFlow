@@ -22,25 +22,29 @@ The primary user is an employee or owner at Game Citi TCG who assists customers 
 
 # 5. Features and user stories
 - Feature 1: Card identification
-    User story: As a Game Citi employee, I want to scan a trading card so that I can identify its exact name, set, and version.
+User story: As a Game Citi employee, I want to scan a trading card so that I can identify its exact name, set, and version.
 
 - Feature 2: Unofficial pre-grading
-    User story: As a Game Citi employee, I want to scan the front and back of a card and receive an estimated grade so that I can determine whether professional grading may be worthwhile.
+User story: As a Game Citi employee, I want to scan the front and back of a card and receive an estimated grade so that I can determine whether professional grading may be worthwhile.
 
 - Feature 3: Dynamic pricing
-    User story: As a card shop owner, I want DeckFlow to adjust its suggested selling prices based on market changes so that I can keep my inventory competitively priced.
+User story: As a card shop owner, I want DeckFlow to adjust its suggested selling prices based on market changes so that I can keep my inventory competitively priced.
 
 # 6. Non-functional requirements
-1. Performance
-    Complete analysis within 30 seconds for 90% of valid scans
-2. Identification Accuracy
-    At least 90% of cards scan are identified correctly
-3. Grading Accuracy
-    At least 85% of the cards have within 1 grade of known grading companies (PSA, TAG, etc.)
-4. Reliability
-    At least 90% of valid scans complete without system failire
-5. Repeatability
-    If a card is scanned more than once, at least 95% of the the card should produce the same grade. 
+1. Performance:
+Complete analysis within 30 seconds for 90% of valid scans
+
+2. Identification Accuracy:
+At least 90% of cards scan are identified correctly
+
+3. Grading Accuracy:
+At least 85% of the cards have within 1 grade of known grading companies (PSA, TAG, etc.)
+
+4. Reliability:
+At least 90% of valid scans complete without system failire
+
+5. Repeatability:
+If a card is scanned more than once, at least 95% of the the card should produce the same grade. 
 
 # 7. Assumptions, dependencies, and constraints
 DeckFlow assumes that images captured using commercially available cameras can provide enough visual detail to detect card defects and generate unofficial grade estimates that are sufficiently accurate and consistent for Game Citi TCG to trust.
@@ -53,19 +57,19 @@ DeckFlow assumes that images captured using commercially available cameras can p
 
 # 8. User flows and design
 1. Scan Trading Card
-    Capture front and back images of card
+Capture front and back images of card
 
 2. Identify Card
-    Determine name, set, and version
+Determine name, set, and version
 
 3. Evaluate condition
-    Detect defects and provide grade estimations
+Detect defects and provide grade estimations
 
 4. Analyze market data
-    Estimate value and dynamic selling price
+Estimate value and dynamic selling price
 
 5. Recommend selling window
-    Sell now or consier selling later
+Sell now or consier selling later
 
 # 9. Release criteria and timeline
 TBD

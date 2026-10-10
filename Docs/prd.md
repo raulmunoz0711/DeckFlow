@@ -56,19 +56,19 @@ DeckFlow assumes that images captured using commercially available cameras can p
 - Development time, equipment costs, and the team's technical resources.
 
 # 8. User flows and design
-1. Scan Trading Card
+1. Scan Trading Card:
 Capture front and back images of card
 
-2. Identify Card
+2. Identify Card:
 Determine name, set, and version
 
-3. Evaluate condition
+3. Evaluate condition:
 Detect defects and provide grade estimations
 
-4. Analyze market data
+4. Analyze market data:
 Estimate value and dynamic selling price
 
-5. Recommend selling window
+5. Recommend selling window:
 Sell now or consier selling later
 
 # 9. Release criteria and timeline

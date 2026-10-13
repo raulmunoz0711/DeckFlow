@@ -1,5 +1,3 @@
-# DeckFlow Design Document
-
 # Responsibilities
 
 - **Team Lead: Raul Munoz**
@@ -12,7 +10,6 @@
   - Organizes project documents, checks writing deadlines, and reviews documents before they are submitted.
 
 # Technology Stack
-
 ## Frontend
 **React**
 - Build the website where employees upload card images and view results.
@@ -36,7 +33,6 @@
 - The stated free tier of 100 requests per day and coverage of 57+ games still need to be verified.
 
 # System Workflow
-
 1. Employee uploads pictures of the front and back of a card.
 2. Backend checks that the images are usable.
 3. System identifies the card's name, set, and version.
@@ -46,7 +42,6 @@
 7. Employee views an assessment report.
 
 # Card Identification
-
 - Use the uploaded images to identify the card's name, set, and version.
 - Use image processing to crop and prepare the card image.
 - Compare card details against supported card information.
@@ -72,14 +67,12 @@
 - If prices are missing or unreliable, tell the employee instead of guessing.
 
 # Selling Time Frame
-
 - Use historical market prices, if available, to look for price trends.
 - Compare recent prices with older prices to help suggest selling now or considering a later sale.
 - Do not make a timing recommendation if there is not enough reliable history.
 - The team still needs to choose the exact trend-analysis method.
 
 # Assessment Report
-
 - Display the card's name, set, and version.
 - Show the unofficial grade and visible defects.
 - Show estimated market value and suggested selling price.
@@ -87,21 +80,12 @@
 - Warn the employee when an image, grade, or price estimate is uncertain.
 
 # Data Storage
-
 - Use PostgreSQL to save card information and assessment results.
 - Store the estimated grade, detected defects, and pricing details for each assessment.
 - Decide whether to save the original images or only references to them.
 - Decide how long saved images and reports should be kept.
 
-# API Design
-
-- `POST /api/assessments` — Receive front and back images and start an assessment.
-- `GET /api/assessments/{id}` — Return the assessment status and report.
-- `GET /api/cards/{id}/market` — Return available market information for a card.
-- These are proposed endpoints and may change during development.
-
 # Testing
-
 - **Card identification:** Test known cards and check whether at least 90% are identified correctly.
 - **Grading:** Compare estimated grades with professional grades; target at least 85% within one grade.
 - **Repeatability:** Scan the same cards multiple times; target 95% same-grade results.
@@ -110,7 +94,6 @@
 - **Bad inputs:** Test blurry images, missing images, and unsupported cards to make sure the system reports the problem.
 
 # Implementation Plan
-
 1. Test camera quality and collect sample card images.
 2. Build the frontend image-upload page and backend upload route.
 3. Implement card identification.
@@ -120,7 +103,6 @@
 7. Test the complete system against the PRD requirements.
 
 # Risks and Open Questions
-
 - Can phone or laptop cameras capture enough detail to detect small defects?
 - Can the model consistently tell the difference between high grades, such as 9 and 10?
 - Do we have enough legally usable images with known professional grades?

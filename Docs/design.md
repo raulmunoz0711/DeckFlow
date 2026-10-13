@@ -33,12 +33,7 @@
 - The stated free tier of 100 requests per day and coverage of 57+ games still need to be verified.
 
 # System Workflow
-<<<<<<< HEAD
 1. Employee uploads pictures of the front and back of a card.
-=======
-
-1. Employee uses a printer which will use the scan feature to scan the card.
->>>>>>> 8b4e859c438d169c885cf606d185970b6166d973
 2. Backend checks that the images are usable.
 3. System identifies the card's name, set, and version.
 4. Image processing and the grading model evaluate its condition.

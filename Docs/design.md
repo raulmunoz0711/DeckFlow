@@ -37,7 +37,7 @@
 
 # System Workflow
 
-1. Employee uploads pictures of the front and back of a card.
+1. Employee uses a printer which will use the scan feature to scan the card.
 2. Backend checks that the images are usable.
 3. System identifies the card's name, set, and version.
 4. Image processing and the grading model evaluate its condition.

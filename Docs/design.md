@@ -25,11 +25,6 @@
 **OpenCV**
 - Detect card boundaries, measure centering, and help find visible defects.
 
-## AI Grading
-**Model/framework: To be decided**
-- Use images and defect measurements to estimate an unofficial card grade.
-- Train or evaluate the model using cards with known professional grades.
-
 ## Database
 **PostgreSQL**
 - Store card details, assessment results, and relevant pricing information.

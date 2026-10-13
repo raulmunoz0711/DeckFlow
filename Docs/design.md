@@ -11,7 +11,6 @@ Will review all code and connections between all code written and ensure that ev
 - Writing Lead: **Anthony Jimenez**
 Will be in charge of writing documents and ensuring that writing deadlines are met. Will review all final writing on github and ensure everything is as intended.
 
-
 # Technology Stack
 ## Frontend
 **React**
@@ -30,5 +29,8 @@ Will be in charge of writing documents and ensuring that writing deadlines are m
 - Store card and assesment information
 
 ## Market Informattion
-TBD
+**TCG API**
+- Covers market, low, median, and foil prices for 57+ games (including Pokémon, Magic: The Gathering, Yu-Gi-Oh!, and Disney Lorcana) with a free tier of 100 requests per day
 
+
+# Card Identification

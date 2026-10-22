@@ -1,0 +1,1 @@
+{"expo":{"name":"DeckFlow","slug":"deckflow","version":"0.2.0","orientation":"portrait","userInterfaceStyle":"light","web":{"bundler":"metro"},"plugins":[["expo-camera",{"cameraPermission":"Allow DeckFlow to photograph the front and back of trading cards."}]],"ios":{"supportsTablet":true}}}

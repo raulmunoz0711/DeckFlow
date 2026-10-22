@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="700" viewBox="0 0 500 700">
+  <rect width="500" height="700" rx="28" fill="#f7ead0"/>
+  <rect x="18" y="18" width="464" height="664" rx="20" fill="none" stroke="#d08a32" stroke-width="12"/>
+  <text x="42" y="70" font-family="Arial" font-size="28" font-weight="bold" fill="#222">Charizard ex</text>
+  <text x="402" y="68" font-family="Arial" font-size="20" fill="#a63221">330 HP</text>
+  <rect x="45" y="92" width="410" height="300" rx="12" fill="#d95f35"/>
+  <circle cx="250" cy="235" r="112" fill="#f59e42"/>
+  <path d="M165 260 Q250 120 335 260 Q292 220 250 315 Q208 220 165 260" fill="#813e2f"/>
+  <text x="58" y="440" font-family="Arial" font-size="21" font-weight="bold">Infernal Reign</text>
+  <text x="58" y="480" font-family="Arial" font-size="15">Sample image for the DeckFlow demonstration.</text>
+  <line x1="48" x2="452" y1="520" y2="520" stroke="#cfb88f"/>
+  <text x="58" y="568" font-family="Arial" font-size="21" font-weight="bold">Burning Darkness</text>
+  <text x="58" y="610" font-family="Arial" font-size="13">223/197 · Special Illustration Rare</text>
+</svg>

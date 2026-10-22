@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="700" viewBox="0 0 500 700">
+  <rect width="500" height="700" rx="28" fill="#173c78"/>
+  <rect x="18" y="18" width="464" height="664" rx="20" fill="none" stroke="#f0d84d" stroke-width="12"/>
+  <ellipse cx="250" cy="350" rx="205" ry="185" fill="#2760ad"/>
+  <circle cx="250" cy="350" r="122" fill="#f5f5ef" stroke="#222" stroke-width="8"/>
+  <path d="M130 350h240" stroke="#222" stroke-width="10"/>
+  <path d="M370 350a120 120 0 0 1-240 0" fill="#e34d3e"/>
+  <circle cx="250" cy="350" r="29" fill="#fff" stroke="#222" stroke-width="8"/>
+  <text x="250" y="95" text-anchor="middle" font-family="Arial" font-size="42" font-weight="bold" fill="#f0d84d">DECKFLOW</text>
+  <text x="250" y="640" text-anchor="middle" font-family="Arial" font-size="17" fill="#d9e4f2">DEMO CARD BACK</text>
+</svg>

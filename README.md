@@ -45,22 +45,7 @@ From `frontend`, run `npm install` and then `npx expo start`. Open the project t
 
 To test bad input, upload a text file renamed with a `.txt` extension or an image smaller than 100 bytes. The app should show an error instead of producing a grade.
 
-## Run the tests
-
-With the containers running:
-
-```bash
-docker compose exec backend pytest -q
-```
-
-Expected result:
-
-```text
-6 passed
-```
-
-## Stop the demo
-
+## To stop software
 ```bash
 docker compose down
 ```

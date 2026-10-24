@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr &
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
+COPY sync_catalog.py ./sync_catalog.py
 COPY tests ./tests
 
 EXPOSE 8000

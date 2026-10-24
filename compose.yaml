@@ -3,6 +3,11 @@ services:
     build: ./backend
     environment:
       - JUSTTCG_API_KEY=${JUSTTCG_API_KEY:-}
+      - DECKFLOW_AI_ENABLED=${DECKFLOW_AI_ENABLED:-1}
+      - HF_HOME=/app/.cache/huggingface
+    volumes:
+      - ./catalog_data:/app/data
+      - deckflow_hf_models:/app/.cache/huggingface
   frontend:
     build: ./frontend
     volumes:
@@ -23,3 +28,6 @@ services:
     command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://gateway:8080
     depends_on:
       - gateway
+
+volumes:
+  deckflow_hf_models:

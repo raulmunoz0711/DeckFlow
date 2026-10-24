@@ -6,3 +6,10 @@ pytest==8.3.4
 httpx==0.28.1
 numpy==2.2.1
 opencv-python-headless==4.10.0.84
+pytesseract==0.3.13
+Pillow==11.1.0
+qrcode==8.0
+
+# Experimental open-source CLIP image condition model
+transformers>=4.48,<5
+torch>=2.3,<3

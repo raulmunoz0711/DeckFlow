@@ -21,19 +21,21 @@ cd DeckFlow
 docker compose up --build
 ```
 
-After both services start, open:
+After the services start, open:
 
 ```text
 http://localhost:5173
 ```
 
-The first build can take several minutes. Later runs are faster.
+The first build can take several minutes because Docker also downloads Nginx and Cloudflare Tunnel. Later runs are faster.
 
 For live JustTCG prices, copy `.env.example` to `.env`, replace the placeholder with your key, and restart Docker. The key stays in the backend and is never exposed to the browser.
 
-## Optional phone run
+## Phone card upload
 
-From `frontend`, run `npm install` and then `npx expo start`. Open the project through Expo Go on a phone connected to the same network. Set `EXPO_PUBLIC_API_URL` to the computer's LAN address, such as `http://192.168.1.20:8000`, because `localhost` on a phone points to the phone itself.
+DeckFlow automatically starts a temporary Cloudflare Quick Tunnel and displays a phone-upload QR code. No IP address, account, router configuration, or shared Wi-Fi network is required. Scan the QR, photograph both sides, and send the card. Keep that phone page open to upload additional cards through the same QR.
+
+The computer and phone need internet access. The temporary `trycloudflare.com` address exists only while the Docker project is running and changes after a restart. Quick Tunnels are intended for demos and development, not production deployment. Anyone who obtains the temporary URL can reach the demo, so do not upload sensitive images.
 
 ## Run the demonstration
 
@@ -45,7 +47,22 @@ From `frontend`, run `npm install` and then `npx expo start`. Open the project t
 
 To test bad input, upload a text file renamed with a `.txt` extension or an image smaller than 100 bytes. The app should show an error instead of producing a grade.
 
-## To stop software
+## Run the tests
+
+With the containers running:
+
+```bash
+docker compose exec backend pytest -q
+```
+
+Expected result:
+
+```text
+6 passed
+```
+
+## Stop the demo
+
 ```bash
 docker compose down
 ```

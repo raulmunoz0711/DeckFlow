@@ -17,6 +17,20 @@ def card_image(color: tuple[int, int, int] = (80, 120, 180)) -> bytes:
     return encoded.tobytes()
 
 
+def damaged_card_image() -> bytes:
+    image = cv2.imdecode(np.frombuffer(card_image((70, 105, 165)), np.uint8), cv2.IMREAD_COLOR)
+    # Simulated exposed paper/whitening, clipped corners, and diagonal creases.
+    cv2.line(image, (0, 90), (0, 730), (245, 245, 245), 24)
+    cv2.line(image, (599, 180), (599, 760), (245, 245, 245), 20)
+    cv2.rectangle(image, (0, 0), (75, 75), (245, 245, 245), -1)
+    cv2.rectangle(image, (525, 765), (599, 839), (245, 245, 245), -1)
+    cv2.line(image, (90, 130), (520, 710), (250, 250, 250), 9)
+    cv2.line(image, (130, 690), (500, 210), (15, 15, 15), 6)
+    ok, encoded = cv2.imencode(".jpg", image)
+    assert ok
+    return encoded.tobytes()
+
+
 def test_health() -> None:
     assert client.get("/api/health").json()["status"] == "ok"
 
@@ -37,6 +51,15 @@ def test_valid_assessment_and_history() -> None:
     assert 1 <= response.json()["estimated_grade"] <= 10
     assert len(response.json()["defects"]) == 5
     assert len(client.get("/api/assessments").json()) == 1
+
+
+def test_damaged_card_scores_below_clean_card() -> None:
+    clean = {"front": ("front.jpg", card_image(), "image/jpeg"), "back": ("back.jpg", card_image(), "image/jpeg")}
+    damaged = {"front": ("front.jpg", damaged_card_image(), "image/jpeg"), "back": ("back.jpg", damaged_card_image(), "image/jpeg")}
+    clean_result = client.post("/api/assessments", files=clean, data={"card_id": "pikachu-160"}).json()
+    damaged_result = client.post("/api/assessments", files=damaged, data={"card_id": "pikachu-160"}).json()
+    assert damaged_result["estimated_grade"] <= clean_result["estimated_grade"] - 2.0
+    assert any(item["severity"] in {"medium", "high"} for item in damaged_result["defects"])
 
 
 def test_rejects_invalid_content_type() -> None:

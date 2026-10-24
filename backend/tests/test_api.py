@@ -46,7 +46,7 @@ def test_health() -> None:
 def test_supported_cards() -> None:
     response = client.get("/api/cards")
     assert response.status_code == 200
-    assert len(response.json()) == 3
+    assert len(response.json()) >= 6
 
 
 def test_valid_assessment_and_history() -> None:

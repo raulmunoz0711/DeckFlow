@@ -136,6 +136,28 @@ def _ocr_orientation_score(image: np.ndarray) -> float:
         return 0.0
 
 
+def _back_orientation_score(image: np.ndarray) -> float:
+    """Detect upright Pokemon card back via printed logo OCR, not subjective card quality."""
+    # Pokemon back has a large yellow logo at top in the upright orientation.
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, np.array([13, 90, 95]), np.array([40, 255, 255]))
+    h, w = mask.shape
+    top = float(np.mean(mask[int(h*.05):int(h*.37), int(w*.08):int(w*.92)] > 0))
+    bottom = float(np.mean(mask[int(h*.63):int(h*.95), int(w*.08):int(w*.92)] > 0))
+    # Back artwork is sometimes symmetric; use this only as a weak tie breaker.
+    return top - bottom
+
+
+def orient_card(image: np.ndarray, back: bool = False) -> np.ndarray:
+    """Choose a portrait/upright orientation after the card rectangle has been extracted."""
+    candidates = [image, cv2.rotate(image, cv2.ROTATE_180)]
+    # Card extraction returns a 600x840 portrait rectangle. OCR disambiguates 180°.
+    ocr_scores = [_ocr_orientation_score(x) for x in candidates]
+    if back and abs(ocr_scores[0] - ocr_scores[1]) < 35:
+        return max(candidates, key=_back_orientation_score)
+    return candidates[int(ocr_scores[1] > ocr_scores[0])]
+
+
 def _upright_by_ocr(image: np.ndarray) -> np.ndarray:
     rotations = [
         image,
@@ -189,7 +211,7 @@ def _extract_card(image: np.ndarray) -> tuple[np.ndarray, bool]:
         target = np.array([[0, 0], [599, 0], [599, 839], [0, 839]], dtype="float32")
         warped = cv2.warpPerspective(work, cv2.getPerspectiveTransform(source, target), (600, 840))
         upside_down = cv2.rotate(warped, cv2.ROTATE_180)
-        return max((warped, upside_down), key=_ocr_orientation_score), True
+        return orient_card(warped), True
 
     # If edge detection is uncertain, use the same centered 2.5 x 3.5 region
     # displayed by the camera guide. This removes most of the room/person.
@@ -240,6 +262,46 @@ def _condition(grade: float) -> str:
     return "Moderately/Heavily Played"
 
 
+# DECKFLOW_CLIP_CONDITION_V1 — pretrained, experimental; NOT PSA grading.
+from functools import lru_cache
+import os
+
+CONDITION_PROMPTS = (
+    "A photo of the back of a pristine Pokemon trading card with sharp corners and no white edge wear.",
+    "A photo of the back of a lightly played Pokemon trading card with minor white edge wear.",
+    "A photo of the back of a heavily played Pokemon trading card with worn white edges and damaged corners.",
+    "A photo of the back of a severely damaged Pokemon trading card with creases, bends and peeling paper.",
+)
+
+@lru_cache(maxsize=1)
+def _load_clip():
+    from transformers import CLIPModel, CLIPProcessor
+    model_id = "openai/clip-vit-base-patch32"
+    model = CLIPModel.from_pretrained(model_id)
+    model.eval()
+    return model, CLIPProcessor.from_pretrained(model_id)
+
+
+def _clip_back_condition(back):
+    if os.getenv("DECKFLOW_AI_ENABLED", "0") != "1":
+        return None
+    try:
+        import torch
+        from PIL import Image as PILImage
+        model, processor = _load_clip()
+        img = PILImage.fromarray(cv2.cvtColor(back, cv2.COLOR_BGR2RGB))
+        inputs = processor(text=list(CONDITION_PROMPTS), images=img, return_tensors="pt", padding=True)
+        with torch.inference_mode():
+            probs = torch.softmax(model(**inputs).logits_per_image[0], dim=-1).tolist()
+        labels = ["clean", "light wear", "heavy wear", "severely damaged"]
+        idx = max(range(4), key=lambda i: probs[i])
+        rough = sum(a*b for a,b in zip(probs, (9.2,7.0,4.0,2.0)))
+        return rough, labels[idx], probs[idx]
+    except Exception as exc:
+        print(f"DeckFlow optional CLIP unavailable: {type(exc).__name__}: {exc}")
+        return None
+
+
 def analyze_card(front_data: bytes, back_data: bytes) -> GradeResult:
     front, front_found = _extract_card(_decode(front_data))
     back, back_found = _extract_card(_decode(back_data))
@@ -258,26 +320,46 @@ def analyze_card(front_data: bytes, back_data: bytes) -> GradeResult:
     corner_damage = max(front_corner, back_corner)
     surface_anomaly = max(front_surface, back_surface)
 
-    centering_penalty = max(0.0, ((df + db) / 2 - 3.0) * .10)
+    # Front artwork (especially full-art cards) is not a consistent centering border.
+    # Back centering is a more stable basis for a conservative provisional score.
+    centering_penalty = max(0.0, (db - 4.0) * .08)
     edge_penalty = min(3.0, whitening * 9.0)
     corner_penalty = min(2.0, corner_damage * 3.2)
-    surface_penalty = min(2.4, glare * 8.0 + darkness * 3.0 + surface_anomaly * 2.2)
+    # Ordinary card artwork and holo patterns contain diagonal lines. A single
+    # front/back photograph cannot reliably separate those from real scratches.
+    # Keep the signal in the report for manual review but do not subtract a grade.
+    # Treat lines in artwork as unverified. A strong diagonal anomaly visible
+    # on BOTH sides is stronger evidence than a single artwork feature. This
+    # remains an experimental heuristic, not professional scratch detection.
+    correlated_lines = min(front_surface, back_surface)
+    surface_penalty = min(0.8, glare * 3.0 + darkness * 1.0) + max(0.0, correlated_lines - 0.45) * 5.0
     focus_penalty = min(1.8, max(0.0, 110.0 - sharpness) / 65.0)
-    grade = round(max(1.0, min(10.0, 10.0 - centering_penalty - edge_penalty - corner_penalty - surface_penalty - focus_penalty)) * 2) / 2
+    baseline = max(1.0, min(10.0, 10.0 - centering_penalty - edge_penalty - corner_penalty - surface_penalty - focus_penalty))
+    clip_signal = _clip_back_condition(back)
+    # CLIP is not trained for card grading. Limit its influence to at most one point.
+    if clip_signal:
+        ai_target, ai_label, ai_similarity = clip_signal
+        baseline += max(-1.0, min(1.0, (ai_target - baseline) * 0.25))
+    grade = round(max(1.0, min(10.0, baseline)) * 2) / 2
 
     centering_severity = "none" if (df + db) / 2 < 5 else "low" if (df + db) / 2 < 10 else "medium"
     edge_severity = "none" if whitening < .025 else "low" if whitening < .09 else "medium"
     corner_severity = "none" if corner_damage < .08 else "low" if corner_damage < .25 else "medium" if corner_damage < .5 else "high"
-    surface_severity = "none" if glare < .015 and darkness < .02 and surface_anomaly < .12 else "low" if surface_anomaly < .3 and glare < .06 else "medium" if surface_anomaly < .65 else "high"
+    surface_severity = "none" if glare < .04 and darkness < .03 else "low" if glare < .10 else "medium"
     focus_severity = "none" if sharpness >= 110 else "low" if sharpness >= 55 else "medium"
     defects = [
         {"category": "Centering", "result": f"Front {hf:.0f}/{100-hf:.0f} horizontal; back {hb:.0f}/{100-hb:.0f}", "severity": centering_severity},
         {"category": "Corners", "result": f"Possible corner damage score: {corner_damage * 100:.0f}%", "severity": corner_severity},
         {"category": "Edges", "result": f"Possible whitening score: {whitening * 100:.1f}%", "severity": edge_severity},
-        {"category": "Surface", "result": f"Possible crease/scratch score: {surface_anomaly * 100:.0f}%; glare {glare * 100:.1f}%", "severity": surface_severity},
+        {"category": "Surface", "result": f"Artwork/line signal {surface_anomaly * 100:.0f}% (NOT verified damage); glare {glare * 100:.1f}%", "severity": surface_severity},
         {"category": "Photo quality", "result": f"Focus score {sharpness:.0f}", "severity": focus_severity},
     ]
+    if clip_signal:
+        defects[-1]["result"] += f" | Experimental CLIP: {ai_label} (relative text match {ai_similarity:.0%}, not grading confidence)"
+    else:
+        defects[-1]["result"] += " | AI disabled or unavailable"
     quality = min(1.0, sharpness / 180.0) * (1 - min(.6, glare + darkness))
-    confidence = max(.35, min(.92, .50 + quality * .28 + .07 * int(front_found) + .07 * int(back_found)))
+    # Confidence is only acquisition quality, not probability of PSA agreement.
+    confidence = max(.25, min(.72, .30 + quality * .25 + .08 * int(front_found) + .08 * int(back_found)))
     note = "Card boundaries detected on both images." if front_found and back_found else "One or both card boundaries used a centered fallback crop; retake against a plain dark background for better accuracy."
     return GradeResult(grade, round(confidence, 2), f"{hf:.0f}/{100-hf:.0f} front, {hb:.0f}/{100-hb:.0f} back", defects, _condition(grade), note)

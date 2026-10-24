@@ -16,6 +16,7 @@ from pydantic import BaseModel
 import httpx
 import qrcode
 
+from app.catalog import count as catalog_count
 from app.grading import analyze_card, crop_preview, rotate_image_bytes
 from app.identification import OCR_NO_MATCH, identify_card_candidates
 from app.pricing import get_prices
@@ -32,11 +33,43 @@ app.add_middleware(
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_BYTES = 10 * 1024 * 1024
 
-CARD_PROFILES = {
-    "charizard-ex-223": {"card_name": "Charizard ex", "set_name": "Obsidian Flames", "card_number": "223/197", "variant": "Special Illustration Rare", "raw_market_price": 48.25, "graded_market_price": 90.00},
-    "pikachu-160": {"card_name": "Pikachu", "set_name": "Crown Zenith", "card_number": "160/159", "variant": "Secret Rare", "raw_market_price": 14.80, "graded_market_price": 38.00},
-    "umbreon-vmax-215": {"card_name": "Umbreon VMAX", "set_name": "Evolving Skies", "card_number": "215/203", "variant": "Alternate Art Secret", "raw_market_price": 1280.00, "graded_market_price": 1850.00},
-}
+# DECKFLOW_REAL_DEMO_CATALOG_V1
+CARD_PROFILES = {'charizard-ex-223': {'card_name': 'Charizard ex',
+                      'set_name': 'Obsidian Flames',
+                      'card_number': '223/197',
+                      'variant': 'Special Illustration Rare',
+                      'raw_market_price': 48.25,
+                      'graded_market_price': 90.0},
+ 'pikachu-160': {'card_name': 'Pikachu',
+                 'set_name': 'Crown Zenith',
+                 'card_number': '160/159',
+                 'variant': 'Secret Rare',
+                 'raw_market_price': 14.8,
+                 'graded_market_price': 38.0},
+ 'umbreon-vmax-215': {'card_name': 'Umbreon VMAX',
+                      'set_name': 'Evolving Skies',
+                      'card_number': '215/203',
+                      'variant': 'Alternate Art Secret',
+                      'raw_market_price': 1280.0,
+                      'graded_market_price': 1850.0},
+ 'charizard-v-018': {'card_name': 'Charizard V',
+                     'set_name': 'Crown Zenith',
+                     'card_number': '018/159',
+                     'variant': 'Rare V',
+                     'raw_market_price': 0.0,
+                     'graded_market_price': 0.0},
+ 'exeggcute-52': {'card_name': 'Exeggcute',
+                  'set_name': 'Jungle',
+                  'card_number': '52/64',
+                  'variant': 'Common',
+                  'raw_market_price': 0.0,
+                  'graded_market_price': 0.0},
+ 'psyduck-33': {'card_name': 'Psyduck',
+                'set_name': 'Boundaries Crossed',
+                'card_number': '33/149',
+                'variant': 'Common',
+                'raw_market_price': 0.0,
+                'graded_market_price': 0.0}}
 
 
 def match_demo_catalog(hint: str) -> str | None:
@@ -113,6 +146,8 @@ class CandidatePriceRequest(BaseModel):
     card_number: str
     variant: str
     justtcg_id: str | None = None
+    tcgdex_id: str | None = None
+    image_url: str | None = None
     estimated_grade: float
     condition: str
 
@@ -152,6 +187,11 @@ async def public_url() -> dict[str, str]:
     except (httpx.HTTPError, ValueError, TypeError):
         pass
     raise HTTPException(status_code=503, detail="The secure phone link is still starting.")
+
+
+@app.get("/api/catalog-status")
+def catalog_status():
+    return {"cards": catalog_count(), "source": "TCGdex SQLite cache", "ready": catalog_count()>0}
 
 
 @app.get("/api/cards")
@@ -254,6 +294,7 @@ async def create_assessment(
     back: Annotated[UploadFile, File(description="Back image of a trading card")],
     card_id: Annotated[str, Form()] = "charizard-ex-223",
     card_hint: Annotated[str, Form()] = "",
+    set_hint: Annotated[str, Form()] = "",
     front_rotation: Annotated[int, Form()] = 0,
     back_rotation: Annotated[int, Form()] = 0,
 ) -> Assessment:
@@ -282,30 +323,72 @@ async def create_assessment(
             detail=f"DeckFlow could not isolate the full {missing} card boundary. Lay the card flat on a plain dark surface, keep every edge visible, and scan again.",
         )
     grade = vision.grade
-    candidate_profiles, identification_mode = await identify_card_candidates(front_bytes, card_hint)
-    identified = candidate_profiles[0] if candidate_profiles else None
-    # A name alone fits many printings (one Pikachu, dozens of sets). Only a matching
-    # collector number, or a single search result, counts as identified; otherwise the
-    # employee confirms the printing from the candidate list.
-    needs_confirmation = bool(identified) and len(candidate_profiles) > 1 and identified.get("match_basis") != "number"
-    demo_key = None if identified else match_demo_catalog(card_hint)
-    if needs_confirmation:
-        profile = {"card_name": f'{identified["card_name"]} (confirm printing)', "set_name": "Several printings match", "card_number": "Pick one below", "variant": "Name matched only", "raw_market_price": 0.0, "graded_market_price": 0.0}
-        identification_mode += "; name-only match, so pick the correct printing below"
-    elif identified:
-        # Never borrow another card's cached price if live pricing has a gap.
+    # DeckFlow integrated identity resolution. Preserve the printed collector
+    # number in user input; catalog denominators can differ from printed ones.
+    from app.catalog import candidates as catalog_candidates
+    import re as _match_re
+
+    def _number(value):
+        m = _match_re.search(r"(?<!\d)(\d{1,4})\s*/\s*(\d{1,4})(?!\d)", str(value or ""))
+        return (int(m.group(1)), int(m.group(2))) if m else None
+
+    def _name(value):
+        value = _match_re.sub(r"\d{1,4}\s*/\s*\d{1,4}", " ", str(value or ""))
+        return " ".join(_match_re.sub(r"[^a-z0-9 ]", " ", value.casefold()).split())
+
+    requested_num = _number(card_hint)
+    requested_name = _name(card_hint)
+    requested_set = _name(set_hint)
+    # Only use the set label when the frontend explicitly chose a demo photo.
+    try:
+        matches = catalog_candidates(card_hint.strip(), limit=100) if card_hint.strip() else []
+    except (OSError, ValueError, TypeError):
+        matches = []
+    if not matches:
+        matches, identification_mode = await identify_card_candidates(front_bytes, card_hint)
+    else:
+        identification_mode = "Local TCGdex catalog: name and collector number"
+
+    ranked = []
+    seen = set()
+    for item in matches:
+        name, number = _name(item.get("card_name")), _number(item.get("card_number"))
+        if requested_name and name != requested_name:
+            continue
+        if requested_num and (not number or number[0] != requested_num[0]):
+            continue
+        candidate_set = _name(item.get("set_name"))
+        if requested_set and candidate_set != requested_set:
+            continue
+        key = item.get("tcgdex_id") or (name, candidate_set, number)
+        if key in seen:
+            continue
+        seen.add(key)
+        score = (100 if requested_set and requested_set == candidate_set else 0)
+        score += 40 if requested_num and requested_num == number else 15 if requested_num else 0
+        ranked.append((score, item))
+    ranked.sort(key=lambda t: -t[0])
+    candidate_profiles = [item for _, item in ranked]
+    # Number-only or name-only ambiguities require a deliberate selection.
+    identified = candidate_profiles[0] if len(candidate_profiles) == 1 else None
+    needs_confirmation = len(candidate_profiles) > 1
+    if identified:
         profile = {"raw_market_price": 0.0, "graded_market_price": 0.0, **identified}
-    elif demo_key:
-        profile = CARD_PROFILES[demo_key]
-        identification_mode = f"Built-in demo catalog match from typed name/number (live search: {identification_mode})"
+        identification_mode = "Local catalog exact name, collector prefix and printing" 
+        raw_price, graded_price, pricing_source = await get_prices(profile, grade)
+    elif needs_confirmation:
+        profile = {"card_name": requested_name.title() + " (confirm printing)",
+                   "set_name": "Multiple printings", "card_number": "Select below",
+                   "variant": "Printing confirmation required"}
+        raw_price, graded_price = 0.0, 0.0
+        pricing_source = "Select the correct printing below to request a price"
+        identification_mode = "Multiple plausible printings; choose the set from candidates"
     else:
-        profile = {"card_name": "Identification uncertain", "set_name": "Retake or enter card name", "card_number": "Unknown", "variant": "No confident match", "raw_market_price": 0.0, "graded_market_price": 0.0}
-    if not identified and not demo_key and identification_mode == OCR_NO_MATCH:
-        identification_mode += "; no unrelated match was accepted—retake or enter the card name/number"
-    if needs_confirmation:
-        raw_price, graded_price, pricing_source = 0.0, 0.0, "Pick the correct printing below to load its price"
-    else:
-        raw_price, graded_price, pricing_source = await get_prices({**profile, "condition": vision.condition}, grade)
+        profile = {"card_name": "Identification uncertain", "set_name": "Unknown",
+                   "card_number": "Unknown", "variant": "No confident catalog match"}
+        raw_price, graded_price = 0.0, 0.0
+        pricing_source = "No verified catalog ID; market price unavailable"
+        identification_mode = "Card not matched; retry with a name, number, and set"
     profile_data = {**profile, "raw_market_price": raw_price, "graded_market_price": graded_price}
     low = max(1, grade - 0.5)
     high = min(10, grade + 0.5)

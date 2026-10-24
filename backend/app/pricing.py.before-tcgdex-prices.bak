@@ -1,0 +1,59 @@
+"""Stable v1 JustTCG raw-price lookup; never present hypothetical prices as market data."""
+from __future__ import annotations
+import os,re
+from typing import Any
+import httpx
+API='https://api.justtcg.com/v1/cards'
+class CardSearchError(Exception):pass
+def has_api_key():return bool(os.getenv('JUSTTCG_API_KEY','').strip())
+def _norm(s):return re.sub(r'\s+',' ',str(s or '').casefold()).strip()
+def _num(s):
+ m=re.fullmatch(r'\s*0*(\d+)\s*/\s*0*(\d+)\s*',str(s or ''))
+ return (int(m[1]),int(m[2])) if m else None
+async def search_cards(query:str)->list[dict[str,Any]]:
+ if not has_api_key() or not query.strip():return []
+ try:
+  async with httpx.AsyncClient(timeout=12) as client:
+   r=await client.get(API,params={'q':query.strip(),'game':'pokemon','limit':20},headers={'x-api-key':os.environ['JUSTTCG_API_KEY']})
+   r.raise_for_status()
+   return r.json().get('data',[])
+ except httpx.HTTPStatusError as e:
+  status=e.response.status_code
+  if status in (401,403):raise CardSearchError('JustTCG authentication or plan access rejected') from e
+  if status==429:raise CardSearchError('JustTCG rate limit reached') from e
+  raise CardSearchError(f'JustTCG HTTP {status}') from e
+ except (httpx.HTTPError,ValueError,TypeError) as e:raise CardSearchError('JustTCG unavailable or invalid response') from e
+async def search_card(query:str):
+ rows=await search_cards(query)
+ return rows[0] if rows else None
+def _variant_raw(v):
+ if v.get('price') is not None:return float(v['price'])
+ for market in v.get('markets') or []:
+  if market.get('region','NA').upper()=='NA' and market.get('price') is not None:return float(market['price'])
+ return None
+async def get_prices(profile:dict,estimated_grade:float)->tuple[float,float,str]:
+ if not has_api_key():return 0.0,0.0,'Live pricing unavailable — JustTCG key not configured'
+ name=str(profile.get('card_name') or '').strip()
+ number=str(profile.get('card_number') or '').strip()
+ if not name or name.lower().startswith('identification uncertain'):
+  return 0.0,0.0,'Select an identified card before checking prices'
+ try:
+  # Never pass a TCGdex identifier to JustTCG. Search by identity instead.
+  rows=await search_cards(f'{name} {number}')
+  found=next((r for r in rows if _norm(r.get('name'))==_norm(name) and
+              (not _num(number) or _num(r.get('number'))==_num(number))),None)
+  if found is None:return 0.0,0.0,'No exact JustTCG name/collector-number match — price unavailable'
+  options=[]
+  for variant in found.get('variants') or []:
+   if variant.get('type') in (None,'raw'):
+    price=_variant_raw(variant)
+    if price is not None:options.append((variant.get('condition',''),price))
+  if not options:return 0.0,0.0,'Exact card found, but no current raw market price is available'
+  desired=_norm(profile.get('condition','Near Mint'))
+  priorities={'mint':0,'near mint':0,'excellent':1,'lightly played':1,'moderately/heavily played':3,'heavily played':3,'damaged':4}
+  target=priorities.get(desired,0)
+  ranks={'near mint':0,'mint':0,'lightly played':1,'moderately played':2,'heavily played':3,'damaged':4}
+  raw=min(options,key=lambda v:abs(ranks.get(_norm(v[0]),0)-target))[1]
+  return round(raw,2),0.0,'Live JustTCG v1 raw price; graded price unavailable (not fabricated)'
+ except CardSearchError as e:return 0.0,0.0,str(e)+' — no fake demo price'
+ except (ValueError,TypeError,KeyError):return 0.0,0.0,'Pricing data format not recognized — price unavailable'

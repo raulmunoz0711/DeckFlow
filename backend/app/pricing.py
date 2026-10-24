@@ -1,103 +1,141 @@
+"""DeckFlow: free TCGdex market pricing, no JustTCG dependency.
+
+The card's TCGdex ID is resolved through the local SQLite catalog, then its
+TCGplayer USD market quote is fetched and cached for 12 hours. No graded-price
+multipliers are fabricated. A missing quote is explicitly identified.
+"""
 from __future__ import annotations
 
 import os
-from typing import Any
+import re
+import sqlite3
+import time
+from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 
-API = "https://api.justtcg.com/v2/cards"
-
+BASE = "https://api.tcgdex.net/v2"
+CACHE_DB = Path(os.getenv("DECKFLOW_PRICE_DB", "/app/data/prices.sqlite3"))
+TTL_SECONDS = 12 * 60 * 60
 
 class CardSearchError(Exception):
-    """JustTCG could not be searched (bad key, rate limit, outage). The message is safe to show the employee."""
+    pass
 
 
 def has_api_key() -> bool:
-    return bool(os.getenv("JUSTTCG_API_KEY", "").strip())
+    """Kept for compatibility with legacy identification imports.
+
+    TCGdex does not need a key; the existing offline catalog handles search.
+    """
+    return False
 
 
-def _price(variant: dict[str, Any]) -> float | None:
-    market = next((m for m in variant.get("markets", []) if m.get("region", "").upper() == "NA"), None)
-    return float(market["price"]) if market and market.get("price") is not None else None
+def _cache():
+    CACHE_DB.parent.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(CACHE_DB, timeout=10)
+    db.execute("""CREATE TABLE IF NOT EXISTS market_prices (
+        card_id TEXT PRIMARY KEY, usd REAL, variant TEXT,
+        fetched_at INTEGER NOT NULL, source TEXT NOT NULL
+    )""")
+    return db
 
 
-async def search_cards(query: str) -> list[dict[str, Any]]:
-    """Search first; v2 does not permit graded=include on browse/search."""
-    key = os.getenv("JUSTTCG_API_KEY", "").strip()
-    if not key or not query.strip():
-        return []
-    params = {"q": query.strip(), "game": "pokemon", "regions": "NA", "limit": 10}
+def _local_id(profile: dict) -> tuple[str | None, str | None]:
+    """Prefer verified TCGdex IDs; otherwise exact-match name, set and number locally."""
+    id_ = str(profile.get("tcgdex_id") or "")
+    if id_:
+        if ":" in id_:
+            language, card_id = id_.split(":", 1)
+        else:
+            language, card_id = "en", id_
+        if language in {"en", "ja"} and re.fullmatch(r"[a-zA-Z0-9_.-]{2,70}", card_id):
+            return language, card_id
+        return None, None
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(API, params=params, headers={"x-api-key": key})
-            response.raise_for_status()
-            return response.json().get("data", [])
-    except httpx.HTTPStatusError as exc:
-        status = exc.response.status_code
-        if status in (401, 403):
-            raise CardSearchError("JustTCG rejected the API key (check JUSTTCG_API_KEY in .env)") from exc
-        if status == 429:
-            raise CardSearchError("JustTCG rate limit reached; wait a minute and scan again") from exc
-        raise CardSearchError(f"JustTCG returned HTTP {status}") from exc
-    except (httpx.HTTPError, ValueError) as exc:
-        raise CardSearchError("JustTCG could not be reached") from exc
+        from app.catalog import candidates
+        query = f'{profile.get("card_name", "")} {profile.get("card_number", "")}'
+        rows = candidates(query, limit=20)
+        name = str(profile.get("card_name") or "").casefold().strip()
+        set_name = str(profile.get("set_name") or "").casefold().strip()
+        number = str(profile.get("card_number") or "").strip()
+        matching = [r for r in rows if
+                    r.get("card_name", "").casefold().strip() == name and
+                    r.get("set_name", "").casefold().strip() == set_name and
+                    str(r.get("card_number", "")).strip() == number]
+        if len(matching) == 1:
+            return _local_id(matching[0])
+    except (ImportError, OSError, sqlite3.Error, ValueError):
+        pass
+    return None, None
 
 
-async def search_card(query: str) -> dict[str, Any] | None:
+def _choose_usd(pricing: dict) -> tuple[float | None, str]:
+    data = pricing.get("tcgplayer") or {}
+    if str(data.get("unit", "USD")).upper() != "USD":
+        return None, ""
+    # Prefer holofoil for a holo print; otherwise a deterministic non-foil fallback.
+    for kind in ("holofoil", "holo", "normal", "reverse-holofoil", "reverse", "1st-edition", "unlimited"):
+        variant = data.get(kind)
+        if isinstance(variant, dict):
+            price = variant.get("marketPrice")
+            if isinstance(price, (int, float)) and price > 0:
+                return round(float(price), 2), kind
+    return None, ""
+
+
+async def search_cards(query: str) -> list[dict]:
+    """Compatibility fallback. Identification uses local catalog, not price API."""
+    try:
+        from app.catalog import candidates
+        return candidates(query, limit=6)
+    except (ImportError, OSError, sqlite3.Error):
+        return []
+
+
+async def search_card(query: str) -> dict | None:
     cards = await search_cards(query)
     return cards[0] if cards else None
 
 
 async def get_prices(profile: dict, estimated_grade: float) -> tuple[float, float, str]:
-    fallback_raw = float(profile.get("raw_market_price", 0))
-    # A cached graded price must not appear as the same value for every grade.
-    # This conservative model is only used when JustTCG has no priced PSA variant.
-    grade_multiplier = max(.35, .45 + (estimated_grade / 10) ** 3 * 2.55)
-    fallback_graded = round(fallback_raw * grade_multiplier, 2)
-    fallback = (fallback_raw, fallback_graded, "Cached raw price + grade-dependent modeled estimate")
-    key = os.getenv("JUSTTCG_API_KEY", "").strip()
-    if not key:
-        return fallback
+    """Returns (raw USD market estimate, graded price unavailable, source)."""
+    language, card_id = _local_id(profile)
+    if not card_id:
+        return 0.0, 0.0, "Select an exact TCGdex printing to retrieve a market price"
+    key = f"{language}:{card_id}"
     try:
-        found = None
-        if profile.get("justtcg_id"):
-            found = {"id": profile["justtcg_id"]}
-        else:
-            found = await search_card(f'{profile["card_name"]} {profile.get("card_number", "")}')
-        if not found:
-            return fallback[0], fallback[1], "JustTCG returned no card match; cached prices shown"
-        card_id = found.get("id") or found.get("slug")
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(API, params={"card_id": card_id, "regions": "NA", "graded": "include"}, headers={"x-api-key": key})
-            response.raise_for_status()
-            cards = response.json().get("data", [])
-        card = cards[0] if cards else found
-    except (httpx.HTTPError, CardSearchError, ValueError, TypeError, KeyError):
-        return fallback[0], fallback[1], "JustTCG unavailable; cached demonstration prices shown"
-
-    condition_rank = {"Mint": 0, "Near Mint": 0, "Excellent": 1, "Lightly Played": 1, "Moderately/Heavily Played": 3}
-    api_rank = {"Near Mint": 0, "Lightly Played": 1, "Moderately Played": 2, "Heavily Played": 3, "Damaged": 4}
-    target = condition_rank.get(profile.get("condition", "Near Mint"), 0)
-    raw_options: list[tuple[int, float]] = []
-    graded_options: list[tuple[float, float]] = []
-    for variant in card.get("variants", []):
-        price = _price(variant)
-        if price is None:
-            continue
-        if variant.get("type") == "raw":
-            raw_options.append((abs(api_rank.get(variant.get("condition"), 0) - target), price))
-        elif variant.get("type") == "graded" and str(variant.get("grading", {}).get("company", "")).upper() == "PSA":
-            grade = variant.get("grading", {}).get("grade")
-            if grade is not None:
-                graded_options.append((abs(float(grade) - estimated_grade), price))
-
-    raw = min(raw_options, default=(0, fallback[0]))[1]
-    # No priced PSA sale: model the graded value from the LIVE raw price, not the cached one.
-    graded = min(graded_options, default=(0, round(raw * grade_multiplier, 2)))[1]
-    source = "Live JustTCG pricing"
-    if not graded_options:
-        source += "; grade-dependent modeled estimate (no matching priced PSA sale)"
-    else:
-        source += " (raw condition + nearest priced PSA grade)"
-    return raw, graded, source
-
+        with _cache() as db:
+            cached = db.execute("SELECT usd,variant,fetched_at,source FROM market_prices WHERE card_id=?", (key,)).fetchone()
+        if cached and int(time.time()) - cached[2] < TTL_SECONDS:
+            if cached[0] is not None:
+                return float(cached[0]), 0.0, f"Cached TCGdex / TCGplayer USD {cached[1]} market quote (not PSA graded)"
+            return 0.0, 0.0, cached[3]
+    except sqlite3.Error:
+        cached = None
+    try:
+        url = f"{BASE}/{language}/cards/{quote(card_id, safe='')}"
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            response = await client.get(url, headers={"User-Agent": "DeckFlow-CPSC490/1.0"})
+        if response.status_code == 429:
+            raise CardSearchError("TCGdex temporarily rate-limited requests")
+        response.raise_for_status()
+        card = response.json()
+        if not isinstance(card, dict) or card.get("id") != card_id:
+            raise CardSearchError("TCGdex returned an unexpected card")
+        price, variant = _choose_usd(card.get("pricing") or {})
+        source = (f"TCGdex / TCGplayer USD {variant} market price; graded price unavailable"
+                  if price is not None else
+                  "TCGdex has no USD market quote for this printing; graded price unavailable")
+        try:
+            with _cache() as db:
+                db.execute("INSERT OR REPLACE INTO market_prices VALUES (?,?,?,?,?)",
+                           (key, price, variant, int(time.time()), source))
+                db.commit()
+        except sqlite3.Error:
+            pass
+        return price or 0.0, 0.0, source
+    except (httpx.HTTPError, ValueError, TypeError, CardSearchError) as e:
+        if cached and cached[0] is not None:
+            return float(cached[0]), 0.0, f"Older cached TCGdex USD price (source temporarily unavailable; last fetched {cached[2]})"
+        return 0.0, 0.0, f"Market price unavailable: {type(e).__name__}; no fabricated values"

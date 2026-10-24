@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 import pytesseract
 
+from app.catalog import candidates as catalog_candidates, count as catalog_count
 from app.grading import _extract_card
 from app.pricing import CardSearchError, has_api_key, search_cards
 
@@ -83,8 +84,21 @@ async def identify_card_candidates(front_data: bytes, hint: str = "") -> tuple[l
 
     # Without a key every JustTCG search returns nothing, so running ~5-9 s of OCR
     # first would only delay a guaranteed miss. Say why instead.
+    # DECKFLOW_TCGDEX_CATALOG_V1: local data works without JustTCG credentials.
+    local = catalog_candidates(hint) if hint.strip() else []
+    if local:
+        return local, "Local TCGdex catalog (user supplied hint; confirm printing)"
     if not has_api_key():
-        return [], NO_KEY_MODE
+        # Try OCR even without a pricing key, when local catalog has been synced.
+        if catalog_count():
+            try:
+                for line in _ocr_candidates(front_data)[:10]:
+                    local = catalog_candidates(line)
+                    if local:
+                        return local, "OCR + local TCGdex catalog; confirm printing"
+            except Exception:
+                pass
+        return [], "No local catalog match (sync data first); JustTCG optional"
 
     try:
         if hint.strip():
@@ -102,9 +116,45 @@ async def identify_card_candidates(front_data: bytes, hint: str = "") -> tuple[l
     except CardSearchError as exc:
         # Keep whatever was found before the failure; never crash the whole assessment.
         return matches, f"Automatic identification unavailable: {exc}"
+    if not matches and catalog_count():
+        try:
+            for line in _ocr_candidates(front_data)[:10]:
+                local = catalog_candidates(line)
+                if local:
+                    return local, "OCR + local TCGdex catalog; confirm printing"
+        except Exception:
+            pass
     return matches, "AI-assisted OCR + JustTCG candidate search" if matches else OCR_NO_MATCH
 
 
 async def identify_card(front_data: bytes, hint: str = "") -> tuple[dict | None, str]:
     matches, mode = await identify_card_candidates(front_data, hint)
     return (matches[0] if matches else None), mode
+
+
+# DECKFLOW_STABILIZE_2026 — catalog-first, strict number matching.
+_original_identify_card_candidates = identify_card_candidates
+
+async def identify_card_candidates(front_data: bytes, hint: str = "") -> tuple[list[dict], str]:
+    from app.catalog import candidates, count
+    import re
+    provided = hint.strip()
+    if provided:
+        matches = candidates(provided, limit=6)
+        if matches:
+            return matches, "Local TCGdex card catalog — confirm exact printing"
+        # A number explicitly supplied by the user must never silently be replaced.
+        if re.search(r"\b\d{1,4}\s*/\s*\d{1,4}\b", provided):
+            return [], "No exact local catalog match for supplied collector number; check set and catalog sync"
+    if count():
+        try:
+            for line in _ocr_candidates(front_data)[:12]:
+                found = candidates(line, limit=6)
+                if found:
+                    return found, "OCR + local TCGdex catalog — confirm printing"
+        except Exception:
+            pass
+    # Without an OCR match avoid a network search for arbitrary text.
+    if not has_api_key():
+        return [], "Local card not identified; scan again or enter its name and number"
+    return await _original_identify_card_candidates(front_data, hint)

@@ -5,3 +5,15 @@ node_modules/
 dist/
 .DS_Store
 .env
+
+# Local backups
+*.bak
+*.backup
+*.before-*
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+node_modules/
+*.sqlite3

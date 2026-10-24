@@ -43,13 +43,25 @@ def _profile(card: dict) -> dict:
     }
 
 
+def _norm_number(value: str) -> str:
+    """'087/130' and '87/130' are the same collector number."""
+    return re.sub(r"\b0+(\d)", r"\1", value.strip().lower())
+
+
+def _match_basis(query: str, card: dict) -> str:
+    """'number' only when a collector number in the query equals the card's; otherwise just 'name'."""
+    found = re.search(r"\b\d{1,3}/\d{1,3}\b", query.lower())
+    number = str(card.get("number") or card.get("card_number") or "")
+    return "number" if found and _norm_number(found.group(0)) == _norm_number(number) else "name"
+
+
 def _plausible_match(candidate: str, card: dict) -> bool:
     candidate_clean = re.sub(r"[^a-z0-9/]", " ", candidate.lower())
     name = str(card.get("name") or card.get("card_name") or "").lower()
     number = str(card.get("number") or card.get("card_number") or "").lower()
     number_match = re.search(r"\b\d{1,3}/\d{1,3}\b", candidate_clean)
     if number_match:
-        return number_match.group(0) == number
+        return _norm_number(number_match.group(0)) == _norm_number(number)
     words = [word for word in candidate_clean.split() if len(word) >= 3 and not word.isdigit()]
     return bool(name) and any(word in name or SequenceMatcher(None, word, name).ratio() >= .72 for word in words)
 
@@ -61,7 +73,7 @@ async def identify_card_candidates(front_data: bytes, hint: str = "") -> tuple[l
         for card in await search_cards(query):
             if require_similarity and not _plausible_match(query, card):
                 continue
-            profile = _profile(card)
+            profile = {**_profile(card), "match_basis": _match_basis(query, card)}
             key = str(profile.get("justtcg_id") or f'{profile["card_name"]}:{profile["card_number"]}')
             if key not in seen:
                 seen.add(key)

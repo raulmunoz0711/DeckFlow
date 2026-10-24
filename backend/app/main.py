@@ -284,8 +284,15 @@ async def create_assessment(
     grade = vision.grade
     candidate_profiles, identification_mode = await identify_card_candidates(front_bytes, card_hint)
     identified = candidate_profiles[0] if candidate_profiles else None
+    # A name alone fits many printings (one Pikachu, dozens of sets). Only a matching
+    # collector number, or a single search result, counts as identified; otherwise the
+    # employee confirms the printing from the candidate list.
+    needs_confirmation = bool(identified) and len(candidate_profiles) > 1 and identified.get("match_basis") != "number"
     demo_key = None if identified else match_demo_catalog(card_hint)
-    if identified:
+    if needs_confirmation:
+        profile = {"card_name": f'{identified["card_name"]} (confirm printing)', "set_name": "Several printings match", "card_number": "Pick one below", "variant": "Name matched only", "raw_market_price": 0.0, "graded_market_price": 0.0}
+        identification_mode += "; name-only match, so pick the correct printing below"
+    elif identified:
         # Never borrow another card's cached price if live pricing has a gap.
         profile = {"raw_market_price": 0.0, "graded_market_price": 0.0, **identified}
     elif demo_key:
@@ -295,7 +302,10 @@ async def create_assessment(
         profile = {"card_name": "Identification uncertain", "set_name": "Retake or enter card name", "card_number": "Unknown", "variant": "No confident match", "raw_market_price": 0.0, "graded_market_price": 0.0}
     if not identified and not demo_key and identification_mode == OCR_NO_MATCH:
         identification_mode += "; no unrelated match was accepted—retake or enter the card name/number"
-    raw_price, graded_price, pricing_source = await get_prices({**profile, "condition": vision.condition}, grade)
+    if needs_confirmation:
+        raw_price, graded_price, pricing_source = 0.0, 0.0, "Pick the correct printing below to load its price"
+    else:
+        raw_price, graded_price, pricing_source = await get_prices({**profile, "condition": vision.condition}, grade)
     profile_data = {**profile, "raw_market_price": raw_price, "graded_market_price": graded_price}
     low = max(1, grade - 0.5)
     high = min(10, grade + 0.5)

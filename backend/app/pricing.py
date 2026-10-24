@@ -92,7 +92,8 @@ async def get_prices(profile: dict, estimated_grade: float) -> tuple[float, floa
                 graded_options.append((abs(float(grade) - estimated_grade), price))
 
     raw = min(raw_options, default=(0, fallback[0]))[1]
-    graded = min(graded_options, default=(0, fallback[1]))[1]
+    # No priced PSA sale: model the graded value from the LIVE raw price, not the cached one.
+    graded = min(graded_options, default=(0, round(raw * grade_multiplier, 2)))[1]
     source = "Live JustTCG pricing"
     if not graded_options:
         source += "; grade-dependent modeled estimate (no matching priced PSA sale)"

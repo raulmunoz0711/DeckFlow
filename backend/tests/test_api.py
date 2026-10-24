@@ -126,3 +126,80 @@ def test_justtcg_failure_degrades_instead_of_crashing(monkeypatch) -> None:
     response = _scan()
     assert response.status_code == 200
     assert "rate limit" in response.json()["identification_mode"]
+
+
+def _pikachus():
+    return [
+        {"id": "p1", "name": "Pikachu", "number": "71/99", "set": {"name": "Arceus"}, "rarity": "Common"},
+        {"id": "p2", "name": "Pikachu", "number": "087/130", "set": {"name": "Base Set 2"}, "rarity": "Common"},
+        {"id": "p3", "name": "Pikachu", "number": "160/159", "set": {"name": "Crown Zenith"}, "rarity": "Secret Rare"},
+    ]
+
+
+def _live_search(monkeypatch, ocr_lines):
+    async def fake_search(_query):
+        return _pikachus()
+
+    async def no_prices(_query):
+        return []
+
+    monkeypatch.setenv("JUSTTCG_API_KEY", "test-key")
+    monkeypatch.setattr("app.identification.search_cards", fake_search)
+    monkeypatch.setattr("app.pricing.search_cards", no_prices)
+    monkeypatch.setattr("app.identification._ocr_candidates", lambda _data: ocr_lines)
+
+
+def test_name_only_match_asks_the_employee_to_confirm(monkeypatch) -> None:
+    _live_search(monkeypatch, ["Pikachu"])
+    body = _scan().json()
+    assert "confirm" in body["card_name"]
+    assert len(body["card_candidates"]) == 3
+    assert body["raw_market_price"] == 0.0
+
+
+def test_matching_collector_number_counts_as_identified(monkeypatch) -> None:
+    _live_search(monkeypatch, ["Pikachu 160/159"])
+    body = _scan().json()
+    assert body["card_name"] == "Pikachu"
+    assert body["card_number"] == "160/159"
+    assert body["set_name"] == "Crown Zenith"
+
+
+def test_leading_zeros_in_collector_numbers_still_match(monkeypatch) -> None:
+    _live_search(monkeypatch, ["87/130"])  # printed 087/130, OCR dropped the zero
+    body = _scan().json()
+    assert body["card_number"] == "087/130"
+
+
+def test_graded_estimate_is_modeled_from_live_raw_price(monkeypatch) -> None:
+    import asyncio
+
+    from app.pricing import get_prices
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": [{"id": "p1", "variants": [{"type": "raw", "condition": "Near Mint", "markets": [{"region": "NA", "price": 2.14}]}]}]}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def get(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setenv("JUSTTCG_API_KEY", "test-key")
+    monkeypatch.setattr("app.pricing.httpx.AsyncClient", FakeClient)
+    profile = {"card_name": "Pikachu", "card_number": "71/99", "justtcg_id": "p1", "raw_market_price": 0.0, "condition": "Near Mint"}
+    raw, graded, source = asyncio.run(get_prices(profile, 8.0))
+    assert raw == 2.14
+    assert graded > 0
+    assert "modeled estimate" in source

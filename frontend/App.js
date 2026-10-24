@@ -210,7 +210,7 @@ function DesktopApp() {
     try {
       const response = await fetch(`${API_URL}/api/candidate-price`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...candidate,estimated_grade:result.estimated_grade,condition:result.condition})});
       const priced = await response.json(); if (!response.ok) throw new Error(priced.detail || "Could not load that card's price.");
-      setResult(old => ({...old,...priced}));
+      setResult(old => ({...old,...priced,identification_mode:"Employee-confirmed match from the JustTCG candidate list; grade calculated from uploaded image pixels"}));
     } catch (e) { setError(e.message || "Could not load that card's price."); }
   }
   return <ImageBackground source={{ uri: "/sample_data/library-background.webp" }} style={s.background} imageStyle={s.backgroundImage} resizeMode="cover"><SafeAreaView style={s.safe}><StatusBar style="dark" />{cameraSide && <Camera side={cameraSide} close={() => setCameraSide(null)} captured={p => { const side = cameraSide; if (side === "Front") setCardHint(""); setCameraSide(null); clipPhoto(side, p); }} />}

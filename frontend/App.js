@@ -77,10 +77,29 @@ function MobileUpload({ sessionId }) {
   return <SafeAreaView style={s.mobilePage}><StatusBar style="dark" /><View style={s.mobileCard}><View style={s.logo}><Text style={s.logoText}>DF</Text></View><Text style={s.mobileTitle}>Send card to DeckFlow</Text><Text style={s.muted}>Photograph the card flat on a plain dark surface. These pictures will appear automatically on the laptop.</Text>{picker("1. Card front",front,setFront)}{picker("2. Card back",back,setBack)}<Button onPress={send} disabled={busy}>{busy ? "Sending…" : "Send to laptop"}</Button>{message ? <Text style={message.startsWith("✓") ? s.mobileSuccess : s.error}>{message}</Text> : null}</View></SafeAreaView>;
 }
 
+// An original mascot: a little playing-card critter built from plain Views, so it
+// needs no images or extra packages and looks the same on web, iOS and Android.
+function DeckBuddy({ step }) {
+  const swing = step % 2 ? 1 : -1;   // legs swap and the body bounces every tick
+  const blink = step === 7;          // one quick blink per lap
+  const spark = (size, extra) => <View style={[s.buddySpark, { width: size, height: size }, extra]} />;
+  return <View style={s.runner}>
+    {spark(5, { left: 2, top: 22 - swing * 3, opacity: .35 })}
+    {spark(7, { left: 12, top: 15 + swing * 3, opacity: .6 })}
+    {spark(9, { left: 22, top: 24 - swing * 2, opacity: .9 })}
+    <View style={[s.buddyBody, { transform: [{ translateY: swing > 0 ? -4 : 0 }, { rotate: "7deg" }] }]}>
+      <View style={s.buddyEyes}><View style={[s.buddyEye, { height: blink ? 1 : 6 }]} /><View style={[s.buddyEye, { height: blink ? 1 : 6 }]} /></View>
+      <View style={s.buddyMark} />
+    </View>
+    <View style={[s.buddyLeg, { left: 42, transform: [{ rotate: `${swing * 30}deg` }] }]} />
+    <View style={[s.buddyLeg, { left: 56, transform: [{ rotate: `${-swing * 30}deg` }] }]} />
+  </View>;
+}
+
 function LoadingRunner() {
   const [step, setStep] = useState(0);
   useEffect(() => { const timer = setInterval(() => setStep(value => (value + 1) % 12), 120); return () => clearInterval(timer); }, []);
-  return <View style={s.loadingScene}><View style={s.loadingTrack}><Text style={[s.runner, {marginLeft:`${step * 7}%`}]}>{step % 2 ? "⚡ ◒" : "⚡ ◓"}</Text></View><Text style={s.loadingTitle}>Deck buddy is checking the edges…</Text><Text style={s.muted}>Comparing centering, corners, surface and market matches.</Text></View>;
+  return <View style={s.loadingScene}><View style={s.loadingTrack} accessible accessibilityLabel="DeckFlow is analyzing your card"><View style={{marginLeft:`${step * 6}%`}}><DeckBuddy step={step} /></View></View><Text style={s.loadingTitle}>Deck buddy is checking the edges…</Text><Text style={s.muted}>Comparing centering, corners, surface and market matches.</Text></View>;
 }
 
 function DesktopApp() {
@@ -227,8 +246,14 @@ Object.assign(s, StyleSheet.create({
   ,selectedCandidate:{borderColor:"#3f775d",backgroundColor:"#edf5f0"}
   ,selectText:{fontSize:9,fontWeight:"900",letterSpacing:.7,color:"#a75d39"}
   ,loadingScene:{minHeight:360,justifyContent:"center",paddingHorizontal:22}
-  ,loadingTrack:{height:54,justifyContent:"center",borderBottomWidth:3,borderBottomColor:"#d8c8aa",marginBottom:17,overflow:"hidden"}
-  ,runner:{fontSize:31,width:70}
+  ,loadingTrack:{height:54,justifyContent:"flex-end",borderBottomWidth:3,borderBottomColor:"#d8c8aa",marginBottom:17,overflow:"hidden"}
+  ,runner:{width:78,height:50}
+  ,buddyBody:{position:"absolute",left:34,top:2,width:32,height:38,borderRadius:7,backgroundColor:"#fff8e6",borderWidth:3,borderColor:"#26332d",alignItems:"center",paddingTop:6}
+  ,buddyEyes:{flexDirection:"row",gap:7,paddingLeft:4,height:6,alignItems:"center"}
+  ,buddyEye:{width:5,borderRadius:3,backgroundColor:"#26332d"}
+  ,buddyMark:{width:9,height:9,marginTop:7,backgroundColor:"#e0a526",transform:[{rotate:"45deg"}]}
+  ,buddyLeg:{position:"absolute",top:38,width:6,height:12,borderRadius:3,backgroundColor:"#26332d"}
+  ,buddySpark:{position:"absolute",backgroundColor:"#e0a526",transform:[{rotate:"45deg"}]}
   ,loadingTitle:{fontSize:18,fontWeight:"900",color:"#26332d",marginBottom:5}
   ,handNote:{alignSelf:"flex-start",marginTop:18,color:"#7b533e",fontSize:13,fontStyle:"italic",backgroundColor:"rgba(255,248,218,.88)",paddingVertical:8,paddingHorizontal:12,borderRadius:5,transform:[{rotate:"-1deg"}]}
 }));

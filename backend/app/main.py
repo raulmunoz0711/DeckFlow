@@ -4,6 +4,7 @@ import hashlib
 import base64
 import io
 import os
+import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -16,7 +17,7 @@ import httpx
 import qrcode
 
 from app.grading import analyze_card, crop_preview, rotate_image_bytes
-from app.identification import identify_card_candidates
+from app.identification import OCR_NO_MATCH, identify_card_candidates
 from app.pricing import get_prices
 
 app = FastAPI(title="DeckFlow Demo API", version="0.2.0")
@@ -36,6 +37,24 @@ CARD_PROFILES = {
     "pikachu-160": {"card_name": "Pikachu", "set_name": "Crown Zenith", "card_number": "160/159", "variant": "Secret Rare", "raw_market_price": 14.80, "graded_market_price": 38.00},
     "umbreon-vmax-215": {"card_name": "Umbreon VMAX", "set_name": "Evolving Skies", "card_number": "215/203", "variant": "Alternate Art Secret", "raw_market_price": 1280.00, "graded_market_price": 1850.00},
 }
+
+
+def match_demo_catalog(hint: str) -> str | None:
+    """Offline lookup of the built-in demo cards from text the employee typed.
+
+    A typed collector number must match exactly; otherwise every word of the card
+    name must be present. Anything looser could put the wrong card on a report.
+    """
+    text = re.sub(r"[^a-z0-9/ ]", " ", hint.lower())
+    typed_number = re.search(r"\b\d{1,3}/\d{1,3}\b", text)
+    words = text.split()
+    for key, profile in CARD_PROFILES.items():
+        if typed_number:
+            if typed_number.group(0) == profile["card_number"]:
+                return key
+        elif all(word in words for word in profile["card_name"].lower().split()):
+            return key
+    return None
 
 
 class Defect(BaseModel):
@@ -241,11 +260,13 @@ async def create_assessment(
     started = time.perf_counter()
     front_bytes = await read_image(front, "front")
     back_bytes = await read_image(back, "back")
-    front_bytes = rotate_image_bytes(front_bytes, front_rotation)
-    back_bytes = rotate_image_bytes(back_bytes, back_rotation)
     if card_id not in CARD_PROFILES:
         raise HTTPException(status_code=400, detail="That demo fallback card is not supported.")
-    fallback_profile = CARD_PROFILES.get(card_id, CARD_PROFILES["charizard-ex-223"])
+    try:
+        front_bytes = rotate_image_bytes(front_bytes, front_rotation)
+        back_bytes = rotate_image_bytes(back_bytes, back_rotation)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     digest = hashlib.sha256(front_bytes + back_bytes).hexdigest()
     try:
@@ -263,13 +284,16 @@ async def create_assessment(
     grade = vision.grade
     candidate_profiles, identification_mode = await identify_card_candidates(front_bytes, card_hint)
     identified = candidate_profiles[0] if candidate_profiles else None
+    demo_key = None if identified else match_demo_catalog(card_hint)
     if identified:
-        profile = {**fallback_profile, **identified}
-    elif card_hint.strip():
-        profile = fallback_profile
+        # Never borrow another card's cached price if live pricing has a gap.
+        profile = {"raw_market_price": 0.0, "graded_market_price": 0.0, **identified}
+    elif demo_key:
+        profile = CARD_PROFILES[demo_key]
+        identification_mode = f"Built-in demo catalog match from typed name/number (live search: {identification_mode})"
     else:
         profile = {"card_name": "Identification uncertain", "set_name": "Retake or enter card name", "card_number": "Unknown", "variant": "No confident match", "raw_market_price": 0.0, "graded_market_price": 0.0}
-    if not identified:
+    if not identified and not demo_key and identification_mode == OCR_NO_MATCH:
         identification_mode += "; no unrelated match was accepted—retake or enter the card name/number"
     raw_price, graded_price, pricing_source = await get_prices({**profile, "condition": vision.condition}, grade)
     profile_data = {**profile, "raw_market_price": raw_price, "graded_market_price": graded_price}

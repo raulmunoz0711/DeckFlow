@@ -9,7 +9,7 @@ This is a CPSC 490 demonstration, not a professional grading service. Camera cap
 - Docker Desktop 4.x or newer
 - macOS, Windows, or Linux
 - About 1 GB of free disk space for the first container build
-- No API key is required for grading; a JustTCG key is optional for live prices
+- No API key is required for grading. A JustTCG key is required for automatic card identification and live prices; without one, type a built-in demo card's name or collector number (for example `160/159`) in the optional box
 
 The containers use Python 3.12, Node.js 22, Expo SDK 58, and React Native 0.88. Docker handles these versions and dependencies automatically.
 
@@ -39,7 +39,7 @@ The computer and phone need internet access. The temporary `trycloudflare.com` a
 
 ## Run the demonstration
 
-1. Choose one of the three supported demonstration cards. This confirmation step represents the design document's manual fallback when automatic identification is uncertain.
+1. Automatic identification needs a JustTCG key. If it is unsure or no key is set, type the card name or collector number in the optional box; the three built-in demo cards are matched offline.
 2. For a live scan, click **Use camera** under Front, allow browser camera access, align the card with the guide, and click **Capture Front**. Repeat for Back. You can also select saved images or use the included samples.
 3. Click **Analyze card**.
 4. DeckFlow measures focus, glare, centering, corner consistency, and possible edge whitening to calculate an unofficial 1–10 pre-grade. It displays live JustTCG pricing when configured, otherwise cached demo prices.
@@ -58,7 +58,7 @@ docker compose exec backend pytest -q
 Expected result:
 
 ```text
-6 passed
+11 passed
 ```
 
 ## Stop the demo

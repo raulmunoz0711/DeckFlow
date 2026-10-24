@@ -8,7 +8,10 @@ import numpy as np
 import pytesseract
 
 from app.grading import _extract_card
-from app.pricing import search_cards
+from app.pricing import CardSearchError, has_api_key, search_cards
+
+NO_KEY_MODE = "Automatic identification is off: JUSTTCG_API_KEY is not set. Add it to .env and restart Docker, or type the card name/number"
+OCR_NO_MATCH = "OCR could not confidently identify this card"
 
 
 def _ocr_candidates(data: bytes) -> list[str]:
@@ -66,19 +69,28 @@ async def identify_card_candidates(front_data: bytes, hint: str = "") -> tuple[l
             if len(matches) >= 6:
                 return
 
-    if hint.strip():
-        await add_results(hint.strip(), False)
-        if matches:
-            return matches, "User-assisted JustTCG candidate search"
+    # Without a key every JustTCG search returns nothing, so running ~5-9 s of OCR
+    # first would only delay a guaranteed miss. Say why instead.
+    if not has_api_key():
+        return [], NO_KEY_MODE
 
-    lines = _ocr_candidates(front_data)
-    # Try the cleanest short OCR lines first. Long rules text makes poor search input.
-    candidates = sorted(lines, key=lambda x: (not bool(re.search(r"\d{1,3}/\d{1,3}", x)), abs(len(x) - 14)))
-    for candidate in candidates[:8]:
-        await add_results(candidate, True)
-        if len(matches) >= 6:
-            break
-    return matches, "AI-assisted OCR + JustTCG candidate search" if matches else "OCR could not confidently identify this card"
+    try:
+        if hint.strip():
+            await add_results(hint.strip(), False)
+            if matches:
+                return matches, "User-assisted JustTCG candidate search"
+
+        lines = _ocr_candidates(front_data)
+        # Try the cleanest short OCR lines first. Long rules text makes poor search input.
+        candidates = sorted(lines, key=lambda x: (not bool(re.search(r"\d{1,3}/\d{1,3}", x)), abs(len(x) - 14)))
+        for candidate in candidates[:8]:
+            await add_results(candidate, True)
+            if len(matches) >= 6:
+                break
+    except CardSearchError as exc:
+        # Keep whatever was found before the failure; never crash the whole assessment.
+        return matches, f"Automatic identification unavailable: {exc}"
+    return matches, "AI-assisted OCR + JustTCG candidate search" if matches else OCR_NO_MATCH
 
 
 async def identify_card(front_data: bytes, hint: str = "") -> tuple[dict | None, str]:

@@ -27,7 +27,8 @@ After both services start, open:
 http://localhost:5173
 ```
 
-```end
+After the demo is over:
+```End
 docker compose down
 ```
 

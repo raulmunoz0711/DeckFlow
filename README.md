@@ -19,9 +19,10 @@ The containers use Python 3.12, Node.js 22, Expo SDK 58, and React Native 0.88. 
 git clone https://github.com/raulmunoz0711/DeckFlow.git
 cd DeckFlow
 docker compose up --build
+docker compose exec backend python sync_catalog.py --languages en ja
 ```
 
-After both services start, open:
+After both services start and cards finish indexing, open:
 
 ```text
 http://localhost:5173

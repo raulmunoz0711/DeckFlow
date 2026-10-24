@@ -1,116 +1,149 @@
-# DeckFlow Demo
+# DeckFlow — Pokémon Card Pre-Grading Prototype
 
-DeckFlow is a React Native/Expo, AI-assisted trading-card pre-grading concept for Game Citi TCG. The same frontend runs as a phone app and in a MacBook web browser. This demo follows the workflow in `Docs/design.md`: capture the front and back, validate the images, confirm a supported card, generate an unofficial pre-grade, display cached market information, and save the report to session history.
+DeckFlow is a **CPSC 490 experimental prototype** for identifying Pokémon cards, analyzing front/back photos, and displaying an unofficial condition estimate alongside available raw-card market pricing. It is **not** an official PSA/CGC grade, appraisal, or professional grading service.
 
-This is a CPSC 490 demonstration, not a professional grading service. Camera capture, uploads, validation, computer-vision measurements, the API, error handling, and session history are working software. Automatic card recognition and a trained grading model are future components.
+## What it currently does
+
+- Scan or upload front and back card photos from the web interface or through a phone-upload QR session.
+- Crop the card and analyze visual indicators such as centering, corners, edges, image quality, and possible surface wear.
+- Search a local **TCGdex SQLite** Pokémon catalog (English and Japanese records when synced). Confirm the printing if results are ambiguous.
+- Retrieve **USD TCGplayer raw market pricing through TCGdex** when a supported printing has a price; cache returned prices.
+- Display an experimental estimated grade and assessment report. **Graded/PSA resale prices are not supplied by TCGdex** and are not fabricated.
+- Choose one of three sample cards (Charizard V, Exeggcute, Psyduck) for demonstration.
+- Show a Pikachu loading animation while analyzing cards.
+
+**Limitations:** Card recognition, photo orientation/cropping, and damage grades are not fully reliable. Lighting, holographic effects, glare and image quality can change the estimated grade. Some cards have no USD quote. Do not use the estimate as a guaranteed grade or valuation.
 
 ## Requirements
 
-- Docker Desktop 4.x or newer
-- macOS, Windows, or Linux
-- About 1 GB of free disk space for the first container build
-- No API key is required for grading. A JustTCG key is required for automatic card identification and live prices; without one, type a built-in demo card's name or collector number (for example `160/159`) in the optional box
+- Docker Desktop with Docker Compose
+- Internet access for the first image build, catalog sync, optional market quotes, and Cloudflare QR tunnel
+- A modern desktop browser (the local UI is at `http://localhost:5173`)
 
-The containers use Python 3.12, Node.js 22, Expo SDK 58, and React Native 0.88. Docker handles these versions and dependencies automatically.
+The Docker images install the project's Python and Node dependencies.
 
-## Clone and run
+## Start the project
 
 ```bash
 git clone https://github.com/raulmunoz0711/DeckFlow.git
 cd DeckFlow
-docker compose up --build
+# Switch to the development branch if testing Isaac's current prototype:
+git switch Isaac-Parada---Technical-Lead
+docker compose up --build -d
 ```
 
-After the services start, open:
+Then visit **http://localhost:5173**.
 
-```text
-http://localhost:5173
-```
+If you already cloned the repository, pull the branch's latest changes before rebuilding. Avoid `docker compose down -v` if you need to preserve downloaded model data.
 
-The first build can take several minutes because Docker also downloads Nginx and Cloudflare Tunnel. Later runs are faster.
+### Environment configuration
 
-For live JustTCG prices, copy `.env.example` to `.env`, replace the placeholder with your key, and restart Docker. The key stays in the backend and is never exposed to the browser.
+The backend currently uses **TCGdex for identification/pricing**, which does **not** require a JustTCG API key. The Compose configuration also accepts an optional `JUSTTCG_API_KEY` environment variable for legacy/optional functionality, but **adding a JustTCG key does not change the active TCGdex price provider**.
 
-## Phone card upload
-
-DeckFlow automatically starts a temporary Cloudflare Quick Tunnel and displays a phone-upload QR code. No IP address, account, router configuration, or shared Wi-Fi network is required. Scan the QR, photograph both sides, and send the card. Keep that phone page open to upload additional cards through the same QR.
-
-The computer and phone need internet access. The temporary `trycloudflare.com` address exists only while the Docker project is running and changes after a restart. Quick Tunnels are intended for demos and development, not production deployment. Anyone who obtains the temporary URL can reach the demo, so do not upload sensitive images.
-
-## Run the demonstration
-
-1. Automatic identification needs a JustTCG key. If it is unsure or no key is set, type the card name or collector number in the optional box; the three built-in demo cards are matched offline.
-2. For a live scan, click **Use camera** under Front, allow browser camera access, align the card with the guide, and click **Capture Front**. Repeat for Back. You can also select saved images or use the included samples.
-3. Click **Analyze card**.
-4. DeckFlow measures focus, glare, centering, corner consistency, and possible edge whitening to calculate an unofficial 1–10 pre-grade. It displays live JustTCG pricing when configured, otherwise cached demo prices.
-5. The completed report appears in **Recent assessments** and can be reopened or printed.
-
-To test bad input, upload a text file renamed with a `.txt` extension or an image smaller than 100 bytes. The app should show an error instead of producing a grade.
-
-## Run the tests
-
-With the containers running:
+For local environment configuration:
 
 ```bash
-docker compose exec backend pytest -q
+cp .env.example .env
 ```
 
-Expected result:
+Check the `.env` values for your machine. Do **not** put actual credentials in documentation, bug reports, or screenshots. `.env` should remain untracked by Git.
 
-```text
-11 passed
+## Sync the Pokémon catalog
+
+The backend needs the local catalog for reliable lookup:
+
+```bash
+docker compose exec backend python sync_catalog.py --languages en ja
+curl http://localhost:5173/api/catalog-status
 ```
 
-## Stop the demo
+The status endpoint should return `"ready": true` with a nonzero `"cards"` count. The catalog is saved in `./catalog_data`, mounted into the backend. Do not rerun the complete sync for every scan.
+
+TCGdex data may use a different set total than the number printed in a demo card. The search logic accounts for this but still requires confirmation if a printing cannot be identified unambiguously.
+
+## Test the demo
+
+1. On **http://localhost:5173**, choose Charizard V, Exeggcute, or Psyduck under **Try a sample card**.
+2. Click **Analyze real card** after the sample photos have loaded.
+3. Check the identified name and printing. If multiple candidates are offered, choose the correct printing.
+4. Review the experimental grade, visible-defect indicators and available **raw** market quote.
+5. Alternatively, scan the phone-upload QR code, upload both sides and analyze the received photos.
+
+The phone upload feature uses a temporary Cloudflare Quick Tunnel. Its URL can change across restarts; it is intended for development/classroom demonstration and should not be treated as a secure production upload service.
+
+## Run tests
+
+To run the current focused integration suite:
+
+```bash
+docker compose exec -w /app backend python -m pytest -q tests/test_catalog_integration.py
+```
+
+This suite covers catalog matching and a **mocked** integration path for pricing. Passing it does **not** prove live price availability or real-world grading accuracy.
+
+To run all existing backend tests:
+
+```bash
+docker compose exec -w /app backend python -m pytest -q
+```
+
+Some older tests still assume the previous JustTCG/hardcoded-demo behavior and may fail until updated. The physical-card grading algorithm also needs further validation. Do not interpret those test failures as proof the Docker server failed to start.
+
+## Stop or restart
 
 ```bash
 docker compose down
+docker compose up --build -d
 ```
 
-## What is real and what is mocked
-
-Working in this version:
-
-- React Native/Expo interface for iOS, Android, and web
-- Front and back image uploads
-- Live MacBook webcam capture for a real card front and back
-- File-type, file-size, and missing/invalid-input checks
-- FastAPI assessment endpoint
-- Assessment report and print view
-- Employee-confirmed identification from a limited supported-card list
-- Pixel-based computer-vision pre-grade that changes with the submitted images
-- Measured focus, glare, darkness, centering, corners, and edge whitening
-- Optional JustTCG v2 raw-condition and nearest-PSA-grade pricing
-- Recent assessment session history
-- Automated API tests
-- Docker startup on Apple-silicon and Intel computers
-
-Not yet implemented:
-
-- Automatic card identification
-- A trained machine-learning grade predictor validated against PSA/CGC labels
-- Scratch detection under controlled angled lighting
-- Automatic card identification from unrestricted cards
-
-These mocked components are the next development targets. They are clearly separated in the backend so each can be replaced without changing the user flow.
+Avoid `docker compose down -v`, which can delete Docker-managed cached model data. The catalog is kept in the `catalog_data` bind mount.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  Employee[Game Citi employee] -->|captures front and back| UI[React Native / Expo app]
-  UI -->|multipart request| API[FastAPI backend]
-  API --> Validator[Image validator]
-  API --> Assessor[OpenCV assessment service]
-  API --> Pricing[Optional JustTCG pricing]
-  Assessor -->|report JSON| UI
-  UI -->|print| Report[Assessment report]
+  Browser[Expo / React Native Web UI] --> Gateway[Nginx gateway :5173]
+  Phone[Phone QR upload] --> Tunnel[Cloudflare Quick Tunnel]
+  Tunnel --> Gateway
+  Gateway --> Backend[FastAPI :8000]
+  Gateway --> BrowserService[Expo frontend :5173]
+  Backend --> Catalog[TCGdex SQLite catalog]
+  Backend --> Vision[OpenCV + optional experimental vision model]
+  Backend --> Prices[TCGdex / TCGplayer USD raw quotes]
 ```
 
-## API
+### What is the gateway?
 
-- `GET /api/health` checks whether the backend is running.
-- `GET /api/cards` returns the supported demonstration cards.
-- `GET /api/assessments` returns recent in-memory session reports.
-- `POST /api/assessments` accepts `front`, `back`, and `card_id`, then returns the assessment report.
-- Interactive API documentation is available at `http://localhost:8000/docs`.
+`gateway/nginx.conf` configures the **Nginx reverse proxy**. It listens inside the container on port 8080, exposed on your Mac as **localhost:5173**. It routes:
+- `/api/` requests to the Python backend on port 8000.
+- All other web requests to the Expo frontend on port 5173.
+
+This keeps the frontend and backend reachable through one browser address and gives the Cloudflare tunnel a single destination. **Its GitHub “last updated” time being older is normal** if the routing hasn't changed; it does not need to be edited merely to update its timestamp.
+
+## Useful checks
+
+```bash
+docker compose ps
+curl http://localhost:5173/api/health
+curl http://localhost:5173/api/catalog-status
+docker compose logs --tail=80 backend
+docker compose logs --tail=80 frontend
+```
+
+## Project layout
+
+- `backend/` — FastAPI endpoints, catalog, identification, pricing, vision grading, and tests
+- `frontend/` — Expo UI, samples, QR upload flow, loading animation
+- `gateway/` — Nginx routes between the UI and API
+- `sample_data/` — demo assets
+- `catalog_data/` — local SQLite catalog, generated after sync; not intended for source control
+- `Docs/` — course/project documentation
+- `compose.yaml` — starts the services
+- `.env.example` — configuration example; `.env` is your local runtime configuration
+
+## Known next steps
+
+- Validate condition predictions against a properly labeled real-card dataset, especially clean vs damaged examples.
+- Improve rotation, crop validation, and low-quality image handling for phone uploads.
+- Strengthen identity disambiguation using collector number, set and reference art.
+- Modernize legacy tests and improve production security before any deployment outside a classroom demo.

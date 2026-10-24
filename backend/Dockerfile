@@ -9,4 +9,5 @@ COPY sync_catalog.py ./sync_catalog.py
 COPY tests ./tests
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+COPY start.sh /app/start.sh
+CMD ["sh", "/app/start.sh"]

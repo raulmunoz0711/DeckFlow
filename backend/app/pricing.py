@@ -84,6 +84,42 @@ def _choose_usd(pricing: dict) -> tuple[float | None, str]:
     return None, ""
 
 
+def _rough_graded_price(raw_price: float, estimated_grade: float) -> float:
+    """Calculate a rough graded value from the raw price and estimated grade.
+
+    This is a DeckFlow prototype estimate, not a verified PSA, BGS, or CGC
+    sale price.
+    """
+    if raw_price <= 0:
+        return 0.0
+
+    grade = max(1.0, min(10.0, float(estimated_grade)))
+
+    multipliers = {
+        1: 0.35,
+        2: 0.42,
+        3: 0.50,
+        4: 0.60,
+        5: 0.75,
+        6: 0.95,
+        7: 1.20,
+        8: 1.60,
+        9: 2.40,
+        10: 4.00,
+    }
+
+    lower_grade = int(grade)
+    upper_grade = min(10, lower_grade + 1)
+    fraction = grade - lower_grade
+
+    multiplier = (
+        multipliers[lower_grade]
+        + (multipliers[upper_grade] - multipliers[lower_grade]) * fraction
+    )
+
+    return round(raw_price * multiplier, 2)
+
+
 async def search_cards(query: str) -> list[dict]:
     """Compatibility fallback. Identification uses local catalog, not price API."""
     try:
@@ -99,7 +135,7 @@ async def search_card(query: str) -> dict | None:
 
 
 async def get_prices(profile: dict, estimated_grade: float) -> tuple[float, float, str]:
-    """Returns (raw USD market estimate, graded price unavailable, source)."""
+    """Returns (raw USD market estimate, rough graded estimate, source)."""
     language, card_id = _local_id(profile)
     if not card_id:
         return 0.0, 0.0, "Select an exact TCGdex printing to retrieve a market price"
@@ -109,7 +145,14 @@ async def get_prices(profile: dict, estimated_grade: float) -> tuple[float, floa
             cached = db.execute("SELECT usd,variant,fetched_at,source FROM market_prices WHERE card_id=?", (key,)).fetchone()
         if cached and int(time.time()) - cached[2] < TTL_SECONDS:
             if cached[0] is not None:
-                return float(cached[0]), 0.0, f"Cached TCGdex / TCGplayer USD {cached[1]} market quote (not PSA graded)"
+                raw = float(cached[0])
+                graded = _rough_graded_price(raw, estimated_grade)
+                return (
+                    raw,
+                    graded,
+                    f"Cached TCGdex / TCGplayer USD {cached[1]} market quote "
+                    "+ DeckFlow rough graded-value model (not a verified sale)",
+                )
             return 0.0, 0.0, cached[3]
     except sqlite3.Error:
         cached = None
@@ -124,9 +167,13 @@ async def get_prices(profile: dict, estimated_grade: float) -> tuple[float, floa
         if not isinstance(card, dict) or card.get("id") != card_id:
             raise CardSearchError("TCGdex returned an unexpected card")
         price, variant = _choose_usd(card.get("pricing") or {})
-        source = (f"TCGdex / TCGplayer USD {variant} market price; graded price unavailable"
-                  if price is not None else
-                  "TCGdex has no USD market quote for this printing; graded price unavailable")
+        source = (
+            f"TCGdex / TCGplayer USD {variant} market price "
+            "+ DeckFlow rough graded-value model (not a verified sale)"
+            if price is not None
+            else "TCGdex has no USD market quote for this printing, "
+                 "so a graded estimate cannot be calculated"
+        )
         try:
             with _cache() as db:
                 db.execute("INSERT OR REPLACE INTO market_prices VALUES (?,?,?,?,?)",
@@ -134,8 +181,17 @@ async def get_prices(profile: dict, estimated_grade: float) -> tuple[float, floa
                 db.commit()
         except sqlite3.Error:
             pass
-        return price or 0.0, 0.0, source
+        raw = price or 0.0
+        graded = _rough_graded_price(raw, estimated_grade)
+        return raw, graded, source
     except (httpx.HTTPError, ValueError, TypeError, CardSearchError) as e:
         if cached and cached[0] is not None:
-            return float(cached[0]), 0.0, f"Older cached TCGdex USD price (source temporarily unavailable; last fetched {cached[2]})"
+            raw = float(cached[0])
+            graded = _rough_graded_price(raw, estimated_grade)
+            return (
+                raw,
+                graded,
+                f"Older cached TCGdex USD price + DeckFlow rough graded-value "
+                f"model (source temporarily unavailable; last fetched {cached[2]})",
+            )
         return 0.0, 0.0, f"Market price unavailable: {type(e).__name__}; no fabricated values"

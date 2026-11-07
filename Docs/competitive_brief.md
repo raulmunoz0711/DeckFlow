@@ -166,7 +166,6 @@ The comparison below evaluates each alternative against the same general task: a
 | PreGradeCards | Advertised AI pre-grade | Advertised valuation tools | Shop plan available | From $4.99/month; shop $99/month |
 | CardGrade.io | Advertised AI grading | Advertised valuation tools | Dealer offerings; fit untested | Exact shop cost unknown |
 | AGS | Professional grading | Not primarily a price-research tool | Requires card submission | From approximately $15/card bulk |
-| JustTCG | No physical grading | Catalog and pricing API | Integration component | Paid plans from $19/month |
 
 Competitor features are based on vendor documentation rather than independent testing. A fair assessment requires using the same cards and evaluation criteria across products.
 

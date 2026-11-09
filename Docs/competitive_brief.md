@@ -137,23 +137,6 @@ CardGrade.io offers AI-assisted trading card evaluation.
 **Limitations:** Actual grading accuracy, support for Game Citi TCG's inventory, and integration capabilities require testing.
 **Comparison to DeckFlow:** CardGrade.io demonstrates that computer-vision-based card assessments already exist. DeckFlow's differentiation must come from measurable performance or its usefulness to the client.
 
-### Competitor 5: AGS RoboGrading
-
-**Type:** Professional grading alternative / complement
-**Website:** https://agscard.com/pricing
-
-AGS offers AI-assisted professional card grading.
-**Advertised features:**
-- AI-assisted card inspection.
-- Professional grading.
-- Digital reports.
-- Physical card encapsulation.
-
-**Advertised cost:** Bulk grading begins at approximately $15 per card for a qualifying submission, excluding additional costs.
-**Strengths:** Produces a professionally graded physical card rather than only a preliminary estimate.
-**Limitations:** Requires sending cards for grading, paying submission costs, and waiting for processing.
-**Comparison to DeckFlow:** AGS is not a direct substitute for an instant in-store pre-grade. DeckFlow could complement professional grading services by helping employees decide which cards are worth submitting.
-
 ## 4. Competitive Comparison Matrix
 
 The comparison below evaluates each alternative against the same general task: assessing the condition and potential value of a physical trading card.
@@ -165,7 +148,6 @@ The comparison below evaluates each alternative against the same general task: a
 | Binder AI | Advertised AI pre-grade | Advertised pricing/history | Consumer-oriented; store fit untested | From $3.99/month |
 | PreGradeCards | Advertised AI pre-grade | Advertised valuation tools | Shop plan available | From $4.99/month; shop $99/month |
 | CardGrade.io | Advertised AI grading | Advertised valuation tools | Dealer offerings; fit untested | Exact shop cost unknown |
-| AGS | Professional grading | Not primarily a price-research tool | Requires card submission | From approximately $15/card bulk |
 
 Competitor features are based on vendor documentation rather than independent testing. A fair assessment requires using the same cards and evaluation criteria across products.
 

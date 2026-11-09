@@ -93,8 +93,8 @@ Binder AI offers AI-assisted trading card assessment using photographs.
 - $24.99 per year.
 
 **Strengths:** Binder AI already combines card grading, identification, and market information in one application.
-**Limitations:** Its accuracy on Game Citi TCG's inventory, employee workflow fit, and store-level reporting capabilities have not been independently tested.
-**Comparison to DeckFlow:** Both products address unofficial card grading. DeckFlow's potential advantage is customization around Game Citi TCG's operational requirements, rather than having fundamentally unique grading features.
+**Limitations:** Its accuracy on Game Citi TCG's inventory, employee workflow fit, and store-level reporting capabilities has not been independently tested.
+**Comparison to DeckFlow:** Both products address unofficial card grading. DeckFlow's potential advantage is customization around Game Citi TCG's operational requirements, rather than having fundamentally unique grading features. Binder AI is built around sports cards/TCG, so it gives more options than DeckFlow has provided.
 
 ### Competitor 3: PreGradeCards
 
@@ -111,7 +111,7 @@ PreGradeCards provides AI-assisted pre-grading for trading card collectors and b
 - Plans intended for shops processing multiple cards.
 
 **Advertised pricing:**
-- Hobbyist: $4.99 per month for 40 credits.
+- Hobbyist: $4.99 per month for 50 credits.
 - Shop: $99 per month for 600 credits.
 
 **Strengths:** Provides an existing solution with a business-focused subscription tier, making it a realistic alternative to building custom grading software.
@@ -137,6 +137,8 @@ CardGrade.io offers AI-assisted trading card evaluation.
 **Limitations:** Actual grading accuracy, support for Game Citi TCG's inventory, and integration capabilities require testing.
 **Comparison to DeckFlow:** CardGrade.io demonstrates that computer-vision-based card assessments already exist. DeckFlow's differentiation must come from measurable performance or its usefulness to the client.
 
+---
+
 ## 4. Competitive Comparison Matrix
 
 The comparison below evaluates each alternative against the same general task: assessing the condition and potential value of a physical trading card.
@@ -146,20 +148,8 @@ The comparison below evaluates each alternative against the same general task: a
 | Manual evaluation | Employee judgment | Manual research | Existing store process | Employee time |
 | DeckFlow | Working unofficial demo; validated model planned | Cached prices; further integration planned | Designed for Game Citi TCG | Development, hosting, API and support costs |
 | Binder AI | Advertised AI pre-grade | Advertised pricing/history | Consumer-oriented; store fit untested | From $3.99/month |
-| PreGradeCards | Advertised AI pre-grade | Advertised valuation tools | Shop plan available | From $4.99/month; shop $99/month |
-| CardGrade.io | Advertised AI grading | Advertised valuation tools | Dealer offerings; fit untested | Exact shop cost unknown |
-
-Competitor features are based on vendor documentation rather than independent testing. A fair assessment requires using the same cards and evaluation criteria across products.
-
-### Competitive Interpretation
-
-DeckFlow does not currently demonstrate a unique grading algorithm or superior grading accuracy.
-
-Existing competitors offer many overlapping features, including card assessment, identification, market information, and reports.
-
-However, DeckFlow may differentiate itself through **a workflow customized for Game Citi TCG**, combining assessment, market information, and employee-facing reports within one system.
-
-That advantage must be supported by real comparisons of assessment time, reliability, cost, and usefulness.
+| PreGradeCards | Advertised AI pre-grade | Grade/Pricing/Breakdown/What-Ifs | Shop plan available | 50 Credits: $4.99/month; 600 Credits: $99/month |
+| CardGrade.io | Advertised AI grading | Advertised valuation tools | Dealer offerings | 10 credits: $4.99/month; 80: credits $24.99/month |
 
 ---
 
@@ -198,6 +188,7 @@ As DeckFlow is used, the team could improve its assessment procedures, collect p
 - The trained grading model is not yet professionally validated.
 - Performance targets have not been supported by published benchmarks.
 - Image quality can affect grading results.
+- Information being offered by direct competitors
 - Long-term maintenance and operational costs remain uncertain.
 
 ### Opportunities
@@ -231,6 +222,3 @@ https://pregradecards.com/pricing
 
 **[C3] CardGrade.io — Product Information**  
 https://cardgrade.io/
-
-**[C4] AGS — Professional Grading Pricing**  
-https://agscard.com/pricing
